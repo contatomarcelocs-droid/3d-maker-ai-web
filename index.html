@@ -1,0 +1,1871 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D Maker AI</title>
+<meta name="theme-color" content="#0e0e0e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout no estilo dos estúdios de IA 3D: barra de ícones de altura total à esquerda (logo no topo, conta e créditos embaixo)
+   | painel de criação | viewport 3D | inspetor de impressão. Tema escuro quase preto com acento verde-limão. */
+:root{
+  --bg:#0e0e0e; --panel:#141414; --panel-2:#1e1e1e; --line:#262626; --line-2:#3a3a3a;
+  --fg:#e4e0ea; --muted:#9a97a0; --faint:#67646d;
+  --accent:#c5f955; --accent-ink:#0e0e0e; --accent-soft:rgba(197,249,85,.12);
+  --ok:#5fd39a; --warn:#ffcf5c; --bad:#ff6b5e;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --r:10px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--body);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{display:grid;height:100%;grid-template-columns:72px 330px minmax(0,1fr) 330px;grid-template-rows:auto minmax(0,1fr);padding-bottom:env(safe-area-inset-bottom,0px);
+  grid-template-areas:"rail top top top" "rail left stage right"}
+
+/* Barra superior */
+.top{grid-area:top;display:flex;align-items:center;gap:16px;min-height:56px;padding-top:env(safe-area-inset-top,0px);padding-bottom:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:1px solid var(--line);background:var(--panel)}
+.brand{display:flex;align-items:center;gap:10px;font:700 18px/1 var(--display);letter-spacing:-.01em;white-space:nowrap}
+.brand svg{width:28px;height:28px}
+.brand b{color:var(--accent);font-weight:700}
+.proj{flex:1;min-width:0;display:flex;align-items:center;gap:8px;color:var(--muted)}
+.proj input{background:transparent;border:1px solid transparent;border-radius:6px;padding:5px 8px;min-width:0;width:min(280px,100%);color:var(--fg)}
+.proj input:hover,.proj input:focus{border-color:var(--line-2);background:var(--panel-2)}
+.top-actions{display:flex;gap:8px;align-items:center}
+.api-chip{font:500 12px/1 var(--mono);padding:7px 11px;border-radius:99px;border:1px solid var(--line-2);color:var(--muted);background:transparent;white-space:nowrap;cursor:pointer}
+.api-chip.on{color:var(--accent);border-color:rgba(197,249,85,.35)}
+
+/* Trilho de modos */
+.rail{grid-area:rail;display:flex;flex-direction:column;gap:2px;padding:12px 6px;padding-top:calc(12px + env(safe-area-inset-top,0px));border-right:1px solid var(--line);background:var(--bg)}
+.rail-logo{display:grid;place-items:center;height:44px;margin-bottom:10px}
+.rail-logo img{width:40px;height:40px;display:block}
+.rail button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 2px;border:0;border-radius:var(--r);background:transparent;color:var(--muted);cursor:pointer;font-size:10.5px;line-height:1.15;text-align:center}
+.rail button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rail button:hover{background:var(--panel-2);color:var(--fg)}
+.rail button[aria-selected="true"]{background:var(--panel-2);color:var(--accent)}
+.rail button[aria-selected="true"] svg{filter:drop-shadow(0 0 6px rgba(197,249,85,.35))}
+.rail .sep{height:1px;background:var(--line);margin:6px 8px}
+.rail-foot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:8px;padding-top:10px}
+.credits{display:flex;flex-direction:column;align-items:center;gap:2px;font:600 12px/1 var(--mono);color:var(--accent);background:var(--accent-soft);border:1px solid rgba(197,249,85,.25);border-radius:10px;padding:7px 6px;min-width:52px;cursor:pointer}
+.credits small{font:500 9.5px/1 var(--body);color:var(--muted);letter-spacing:.02em}
+.avatar{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--panel-2);border:1px solid var(--line-2);color:var(--fg);font:700 14px var(--body);cursor:pointer;padding:0}
+.avatar.in{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+
+/* Painéis */
+.panel{background:var(--panel);overflow-y:auto;min-width:0}
+.panel.left{grid-area:left;border-right:1px solid var(--line)}
+.panel.right{grid-area:right;border-left:1px solid var(--line)}
+.sec{padding:18px 18px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.sec:last-child{border-bottom:0}
+h2{font:700 20px/1.15 var(--display);margin:0;letter-spacing:-.01em;text-wrap:balance}
+h3{font:600 11px/1 var(--body);margin:0;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+.lede{margin:0;color:var(--muted);font-size:13px}
+.hint{margin:0;color:var(--faint);font-size:12px}
+.hint b{color:var(--muted);font-weight:500}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 12px;border-radius:8px;border:1px solid var(--line-2);background:var(--panel-2);cursor:pointer;font-weight:500;font-size:13px;white-space:nowrap;user-select:none}
+.btn:hover{border-color:var(--faint)}
+.btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.ghost{background:transparent}
+.btn.wide{width:100%;padding:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>.btn{flex:1}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+
+.field{display:flex;flex-direction:column;gap:6px}
+.field>span,.fl{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:8px}
+.field output{font:500 12px var(--mono);color:var(--fg)}
+input[type=text],input[type=number],input[type=password],select,textarea{width:100%;background:var(--bg);border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;min-width:0}
+textarea{resize:vertical;min-height:96px;line-height:1.45}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=checkbox],input[type=radio]{accent-color:var(--accent)}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg);cursor:pointer}
+
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--bg);border:1px solid var(--line-2);border-radius:9px;padding:3px;gap:3px}
+.seg label{text-align:center;padding:7px 6px;border-radius:6px;cursor:pointer;font-size:12.5px;color:var(--muted)}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--panel-2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line-2)}
+.seg.three{grid-template-columns:repeat(3,1fr)}
+.pnote{margin:0;font:500 12px var(--mono);color:var(--muted);min-height:1.2em}
+
+.drop{position:relative;border:1.5px dashed var(--line-2);border-radius:var(--r);background:var(--bg);min-height:180px;display:grid;place-items:center;overflow:hidden}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop canvas{max-width:100%;max-height:240px;display:block}
+.drop .empty{text-align:center;color:var(--faint);font-size:13px;padding:20px}
+.drop .empty svg{width:34px;height:34px;stroke:var(--faint);fill:none;stroke-width:1.5;display:block;margin:0 auto 8px}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line-2);border-radius:99px;padding:5px 10px;font-size:12px;background:transparent;color:var(--muted);cursor:pointer}
+.chip:hover{color:var(--fg);border-color:var(--faint)}
+
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
+.thumbs .t{position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;background:var(--bg);border:1px solid var(--line)}
+.thumbs canvas{width:100%;height:100%;object-fit:cover;display:block}
+.thumbs .t span{position:absolute;left:4px;bottom:3px;font:500 10px var(--mono);color:#fff;text-shadow:0 1px 2px #000}
+.thumbs .t button{position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:12px;line-height:18px;cursor:pointer;padding:0}
+
+.ring{display:flex;align-items:center;gap:14px}
+.ring svg{width:84px;height:84px;flex:none}
+.ring .rt{font-size:12.5px;color:var(--muted)}
+.ring .rt b{display:block;font:600 22px/1.1 var(--display);color:var(--fg)}
+
+.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.gallery button{padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg);cursor:pointer;aspect-ratio:4/3;position:relative}
+.gallery button.cur{border-color:var(--accent)}
+.gallery img{width:100%;height:100%;object-fit:cover;display:block}
+.gallery small{position:absolute;inset:auto 0 0 0;padding:3px 5px;font-size:10px;text-align:left;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gal-empty{color:var(--faint);font-size:12px}
+
+/* Palco 3D */
+.stage{grid-area:stage;position:relative;min-width:0;min-height:0;background:radial-gradient(120% 90% at 50% 15%,#171b22 0%,var(--bg) 70%)}
+#viewport{position:absolute;inset:0}
+#viewport canvas{width:100%;height:100%;display:block;touch-action:none}
+.tools{position:absolute;top:12px;left:12px;display:flex;gap:4px;flex-wrap:wrap;background:rgba(20,23,28,.88);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:10px;padding:4px;max-width:calc(100% - 24px)}
+.tools button{display:flex;align-items:center;gap:6px;border:0;background:transparent;border-radius:7px;padding:7px 9px;cursor:pointer;color:var(--muted);font-size:12px}
+.tools button svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tools button:hover{color:var(--fg);background:var(--panel-2)}
+.tools button[aria-pressed="true"]{color:var(--accent);background:var(--accent-soft)}
+.tools .div{width:1px;background:var(--line);margin:4px 2px}
+.info{position:absolute;left:12px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;max-width:calc(100% - 24px)}
+.tag{background:rgba(20,23,28,.88);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:500 12px var(--mono);color:var(--fg);white-space:nowrap}
+.tag.name{font-family:var(--body);font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.axes{position:absolute;right:14px;bottom:12px;font:500 11px var(--mono);color:var(--faint);display:flex;gap:10px}
+.axes i{font-style:normal}.axes .x{color:#ff7b72}.axes .y{color:#7ee787}.axes .z{color:#79c0ff}
+
+.progress{position:absolute;inset:0;display:grid;place-items:center;background:rgba(13,15,18,.55);backdrop-filter:blur(3px);z-index:5}
+.pcard{width:min(360px,calc(100% - 32px));background:var(--panel);border:1px solid var(--line-2);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.pcard h4{margin:0;font:700 17px var(--display)}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.steps li{display:flex;align-items:center;gap:8px;color:var(--faint)}
+.steps li::before{content:"";width:8px;height:8px;border-radius:50%;border:1.5px solid currentColor;flex:none}
+.steps li.done{color:var(--muted)}.steps li.done::before{background:var(--ok);border-color:var(--ok)}
+.steps li.now{color:var(--fg)}.steps li.now::before{border-color:var(--accent);background:var(--accent);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.35}}
+.bar{height:6px;border-radius:99px;background:var(--bg);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.pfoot{display:flex;justify-content:space-between;align-items:center;font:500 12px var(--mono);color:var(--muted)}
+
+/* Inspetor */
+.dims{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.dim{display:flex;flex-direction:column;gap:4px}
+.dim label{font:600 11px var(--mono);display:flex;gap:4px;align-items:center}
+.dim label i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.dim input{font-family:var(--mono);font-size:13px;padding:7px 8px}
+.stats{display:grid;grid-template-columns:1fr auto;gap:7px 12px;margin:0;font-size:13px}
+.stats dt{color:var(--muted)}
+.stats dd{margin:0;font:500 13px var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:6px;font:600 12px var(--body);padding:5px 10px;border-radius:99px;border:1px solid}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.ok{color:var(--ok);border-color:rgba(95,211,154,.35);background:rgba(95,211,154,.08)}
+.pill.warn{color:var(--warn);border-color:rgba(255,207,92,.35);background:rgba(255,207,92,.08)}
+.pill.bad{color:var(--bad);border-color:rgba(255,107,94,.35);background:rgba(255,107,94,.08)}
+.est{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.est div{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px}
+.est b{display:block;font:600 16px var(--mono);font-variant-numeric:tabular-nums}
+.est span{font-size:11px;color:var(--muted)}
+.exp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.exp .btn{flex-direction:column;gap:2px;padding:10px}
+.exp .btn small{font-weight:400;color:var(--muted);font-size:11px}
+.exp .btn.primary small{color:var(--accent-ink);opacity:.75}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;background:var(--panel-2);border:1px solid var(--line-2);border-radius:10px;padding:10px 14px;font-size:13px;max-width:min(520px,calc(100% - 32px));transition:.25s;z-index:20;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.toast.bad{border-color:rgba(255,107,94,.5)}
+.toast.ok{border-color:rgba(95,211,154,.5)}
+
+dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line-2);border-radius:14px;padding:0;width:min(460px,calc(100% - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog form,dialog .dlg{padding:20px;display:flex;flex-direction:column;gap:14px}
+dialog .dlg .dlg{padding:0}
+dialog a,.hint a{color:var(--accent)}
+.ledger{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto}
+.ledger>div{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;font-size:13px;padding:7px 9px;background:var(--bg);border-radius:7px}
+.ledger>div span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ledger b{font:600 13px var(--mono)}
+.ledger .pos{color:var(--accent)}.ledger .neg{color:var(--muted)}
+.ledger small{color:var(--faint);font-size:11px}
+.admin{border-top:1px solid var(--line);padding-top:14px!important}
+code{font:12px var(--mono);background:var(--bg);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+
+@media (max-width:1180px){
+  html,body{height:auto}
+  .app{height:auto;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto 62vh auto;grid-template-areas:"top top" "rail rail" "stage stage" "left right"}
+  .rail{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:6px max(8px,env(safe-area-inset-left,0px))}
+  .rail button{flex:1 0 74px}
+  .rail .sep{width:1px;height:auto;margin:6px 2px}
+  .rail-logo{display:none}
+  .rail-foot{margin-top:0;margin-left:auto;flex-direction:row;padding-top:0;padding-left:6px}
+  .panel{overflow:visible}
+}
+@media (max-width:760px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 56vh auto auto;grid-template-areas:"top" "rail" "stage" "left" "right"}
+  .top{flex-wrap:wrap;padding-block:10px;gap:10px}
+  .proj{order:3;flex-basis:100%}
+  .api-chip{display:none}
+  .top-actions{margin-left:auto}
+  .top-actions .btn{padding:8px 10px}
+  .panel.left{border-right:0}
+  .panel.right{border-left:0;border-top:1px solid var(--line)}
+  .sec{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .tools button span{display:none}
+  .axes{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/build/three.module.js",
+  "three/addons/": "./vendor/three/examples/jsm/",
+  "fflate": "./vendor/fflate/browser.js"
+} }
+</script>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span>3D Maker <b>AI</b></span></div>
+    <div class="proj"><label for="projName" class="hint">Projeto</label><input id="projName" type="text" value="Vaso de exemplo"></div>
+    <div class="top-actions">
+      <button type="button" class="api-chip" id="apiChip">Entrar</button>
+      <button class="btn ghost" id="btnSettings" type="button"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Sobre a IA</button>
+      <button class="btn primary" id="btnExportTop" type="button"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Exportar STL</button>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Modos de criação">
+    <div class="rail-logo"><img src="icon.svg" alt="3D Maker AI" width="40" height="40"></div>
+    <button role="tab" data-mode="text" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><path d="m17 15 1.2 2.8L21 19l-2.8 1.2L17 23l-1.2-2.8L13 19l2.8-1.2z"/></svg>Texto<br>→ 3D</button>
+    <button role="tab" data-mode="image" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>Imagem<br>→ 3D</button>
+    <button role="tab" data-mode="scan" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M12 7 17 10v5l-5 3-5-3v-5z"/></svg>Multi-<br>imagem</button>
+    <button role="tab" data-mode="relief" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 17 8 9l4 5 3-3 6 6z"/><path d="M3 21h18"/></svg>Relevo /<br>Litofania</button>
+    <div class="sep"></div>
+    <button role="tab" data-mode="import" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>Importar<br>modelo</button>
+    <div class="rail-foot">
+      <button type="button" class="credits" id="railCredits" title="Seus créditos"><span id="railCreditsN">—</span><small>créditos</small></button>
+      <button type="button" class="avatar" id="btnAccount" title="Entrar" aria-label="Conta">?</button>
+    </div>
+  </nav>
+
+  <aside class="panel left">
+    <!-- Texto → 3D -->
+    <section class="sec" data-mode="text" hidden>
+      <h2>Texto → 3D</h2>
+      <p class="lede">Descreva o objeto. A IA desenha o objeto (FLUX) e depois o transforma em modelo 3D (Hunyuan3D), com modelos abertos.</p>
+      <label class="field"><span>Descrição</span><textarea id="txtPrompt" maxlength="600">Um dragão pequeno sentado, estilo miniatura de RPG, base redonda</textarea></label>
+      <div class="chips" id="txtChips">
+        <button class="chip" type="button">Vaso geométrico low-poly</button>
+        <button class="chip" type="button">Suporte de celular minimalista</button>
+        <button class="chip" type="button">Busto de astronauta</button>
+        <button class="chip" type="button">Chaveiro em forma de gato</button>
+      </div>
+      <div class="grid2">
+        <label class="field"><span>Estilo</span><select id="txtStyle">
+          <option value="realistic product photo, physically based materials">Realista</option>
+          <option value="painted tabletop miniature figure">Miniatura</option>
+          <option value="cute vinyl toy, smooth shapes">Brinquedo</option>
+          <option value="low poly faceted sculpture, matte">Low-poly</option>
+        </select></label>
+        <label class="field"><span>Altura final (mm)</span><input id="txtHeight" type="number" value="80" min="5" max="400"></label>
+      </div>
+      <div class="drop" id="txtPreview" hidden style="min-height:0"><canvas id="txtCanvas"></canvas></div>
+      <button class="btn primary wide" id="btnTxtGen" type="button">Gerar com IA · 1 crédito</button>
+      <p class="hint">Roda na nuvem e usa 1 crédito da sua conta. Se a geração falhar, o crédito volta.</p>
+    </section>
+
+    <!-- Imagem → 3D -->
+    <section class="sec" data-mode="image">
+      <h2>Imagem → 3D</h2>
+      <p class="lede">Uma foto do objeto vira um modelo 3D completo. As partes que não aparecem na foto são estimadas.</p>
+      <div class="drop" id="imgDrop">
+        <canvas id="imgCanvas" hidden></canvas>
+        <div class="empty" id="imgEmpty"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg>Arraste uma foto aqui<br>ou use os botões abaixo</div>
+      </div>
+      <div class="row">
+        <label class="btn"><input type="file" accept="image/*" capture="environment" id="imgCam" hidden><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Tirar foto</label>
+        <label class="btn"><input type="file" accept="image/*" id="imgFile" hidden><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M5 21h14"/></svg>Escolher</label>
+      </div>
+      <div class="seg three" role="radiogroup" aria-label="Motor">
+        <label><input type="radio" name="imgEngine" value="cloud" checked>IA na nuvem</label>
+        <label><input type="radio" name="imgEngine" value="device">IA no aparelho</label>
+        <label><input type="radio" name="imgEngine" value="local">Rápido</label>
+      </div>
+      <p class="hint" data-eng="cloud">Reconstrói o objeto inteiro, inclusive o verso, em cerca de 30 s. Usa 1 crédito; se falhar, o crédito volta.</p>
+      <p class="hint" data-eng="device" hidden>Recorte e profundidade por IA rodando neste aparelho, sem limite de uso. Na 1ª vez baixa ~70 MB.</p>
+      <p class="hint" data-eng="local" hidden>Sem IA: recorta pelo contraste com o fundo e infla a silhueta. Instantâneo.</p>
+      <div class="sec" style="padding:0;border:0">
+        <label class="check" data-eng="local" hidden><input type="checkbox" id="imgAuto" checked> Detectar fundo automaticamente</label>
+        <label class="field" id="imgThrWrap" hidden><span>Sensibilidade do recorte <output id="imgThrOut">40</output></span><input type="range" id="imgThr" min="8" max="160" value="40"></label>
+        <label class="field" data-eng="device local" hidden><span>Volume (espessura) <output id="imgThickOut">0,55</output></span><input type="range" id="imgThick" min="0.15" max="1.2" step="0.05" value="0.55"></label>
+        <label class="field" data-eng="device" hidden><span>Relevo da IA <output id="imgReliefOut">0,50</output></span><input type="range" id="imgRelief" min="0" max="1" step="0.05" value="0.5"></label>
+        <div class="grid2">
+          <label class="field" data-eng="device local" hidden><span>Detalhe</span><select id="imgRes"><option value="72">Rápido</option><option value="110" selected>Médio</option><option value="150">Alto</option></select></label>
+          <label class="field"><span>Altura final (mm)</span><input id="imgHeight" type="number" value="80" min="5" max="400"></label>
+        </div>
+      </div>
+      <button class="btn primary wide" id="btnImgGen" type="button" disabled>Gerar modelo 3D</button>
+      <p class="hint"><b>Dica:</b> fundo liso e contrastante, objeto inteiro no quadro, luz difusa.</p>
+    </section>
+
+    <!-- Multi-imagem -->
+    <section class="sec" data-mode="scan" hidden>
+      <h2>Multi-imagem</h2>
+      <p class="lede">Fotografe o objeto girando em volta dele (ou num prato giratório), sempre na mesma altura e distância. De 12 a 100 fotos.</p>
+      <div class="ring">
+        <svg viewBox="0 0 84 84" id="scanRing" aria-hidden="true"></svg>
+        <div class="rt"><b id="scanCount">0 fotos</b><span id="scanStep">Adicione fotos em ordem, dando a volta completa.</span></div>
+      </div>
+      <div class="row">
+        <label class="btn"><input type="file" accept="image/*" capture="environment" id="scanCam" hidden><svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Tirar foto</label>
+        <label class="btn"><input type="file" accept="image/*" multiple id="scanFiles" hidden><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M5 21h14"/></svg>Adicionar</label>
+        <button class="btn ghost" id="scanClear" type="button">Limpar</button>
+      </div>
+      <div class="thumbs" id="scanThumbs"></div>
+      <div class="seg" role="radiogroup" aria-label="Motor de reconstrução">
+        <label><input type="radio" name="scanEngine" value="local" checked>Local (silhuetas)</label>
+        <label><input type="radio" name="scanEngine" value="cloud">IA na nuvem</label>
+      </div>
+      <div id="scanLocalOpts" class="sec" style="padding:0;border:0">
+        <label class="check"><input type="checkbox" id="scanAiSeg"> Recortar o fundo com IA (mais preciso, ~30 s por foto)</label>
+        <label class="field"><span>Sensibilidade do recorte <output id="scanThrOut">auto</output></span><input type="range" id="scanThr" min="0" max="160" value="0"></label>
+        <div class="grid2">
+          <label class="field"><span>Sentido do giro</span><select id="scanDir"><option value="1">Anti-horário</option><option value="-1">Horário</option></select></label>
+          <label class="field"><span>Detalhe</span><select id="scanRes"><option value="64">Rápido</option><option value="96" selected>Médio</option><option value="128">Alto</option></select></label>
+        </div>
+        <label class="field"><span>Altura final (mm)</span><input id="scanHeight" type="number" value="80" min="5" max="400"></label>
+      </div>
+      <p class="hint" id="scanCloudNote" hidden>Combina até 4 fotos da volta num modelo com textura. Usa 1 crédito; se falhar, o crédito volta.</p>
+      <button class="btn primary wide" id="btnScanGen" type="button" disabled>Reconstruir 3D</button>
+      <p class="hint">O modo local esculpe o volume pelas silhuetas: é fiel no contorno, mas não captura cavidades (o interior de uma xícara, por exemplo).</p>
+    </section>
+
+    <!-- Relevo -->
+    <section class="sec" data-mode="relief" hidden>
+      <h2>Relevo / Litofania</h2>
+      <p class="lede">Transforma uma imagem em placa com relevo. Na litofania, as áreas escuras ficam mais grossas e a foto aparece contra a luz.</p>
+      <div class="drop" id="relDrop">
+        <canvas id="relCanvas" hidden></canvas>
+        <div class="empty" id="relEmpty"><svg viewBox="0 0 24 24"><path d="M3 17 8 9l4 5 3-3 6 6z"/><path d="M3 21h18"/></svg>Arraste uma imagem aqui</div>
+      </div>
+      <label class="btn"><input type="file" accept="image/*" id="relFile" hidden>Escolher imagem</label>
+      <div class="seg" role="radiogroup" aria-label="Tipo">
+        <label><input type="radio" name="relKind" value="litho" checked>Litofania</label>
+        <label><input type="radio" name="relKind" value="relief">Relevo</label>
+      </div>
+      <div class="grid3">
+        <label class="field"><span>Largura</span><input id="relW" type="number" value="100" min="10" max="300"></label>
+        <label class="field"><span>Base</span><input id="relBase" type="number" value="0.8" step="0.1" min="0.4" max="10"></label>
+        <label class="field"><span>Relevo</span><input id="relDepth" type="number" value="2.4" step="0.1" min="0.2" max="30"></label>
+      </div>
+      <label class="field"><span>Detalhe</span><select id="relRes"><option value="120">Rápido</option><option value="200" selected>Médio</option><option value="320">Alto</option></select></label>
+      <button class="btn primary wide" id="btnRelGen" type="button" disabled>Gerar placa</button>
+      <p class="hint">Medidas em mm. Para litofania, imprima em branco com 100% de preenchimento.</p>
+    </section>
+
+    <!-- Importar -->
+    <section class="sec" data-mode="import" hidden>
+      <h2>Importar modelo</h2>
+      <p class="lede">Abra um STL, OBJ, 3MF ou GLB para revisar, reparar e preparar para impressão.</p>
+      <div class="drop" id="impDrop" style="min-height:140px"><div class="empty"><svg viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>Arraste o arquivo aqui</div></div>
+      <div class="row">
+        <label class="btn"><input type="file" accept=".stl,.obj,.3mf,.glb,.gltf" id="impFile" hidden>Escolher arquivo</label>
+        <button class="btn ghost" id="btnSample" type="button">Carregar exemplo</button>
+      </div>
+    </section>
+
+    <section class="sec">
+      <h3>Criações desta sessão</h3>
+      <div class="gallery" id="gallery"></div>
+      <p class="gal-empty" id="galEmpty" hidden>Seus modelos aparecem aqui.</p>
+    </section>
+  </aside>
+
+  <main class="stage">
+    <div id="viewport"></div>
+    <div class="tools" role="toolbar" aria-label="Visualização">
+      <button type="button" id="tRotate" aria-pressed="false" title="Girar 360°"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg><span>360°</span></button>
+      <button type="button" id="tColor" aria-pressed="true" title="Cores"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg><span>Cores</span></button>
+      <button type="button" id="tWire" aria-pressed="false" title="Malha"><svg viewBox="0 0 24 24"><path d="M12 3 21 8v8l-9 5-9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8M7.5 5.5 16.5 10.5M16.5 5.5 7.5 10.5"/></svg><span>Malha</span></button>
+      <button type="button" id="tOver" aria-pressed="false" title="Saliências que precisam de suporte"><svg viewBox="0 0 24 24"><path d="M4 20h16M7 20V9h10"/><path d="M17 9l3-3"/></svg><span>Suportes</span></button>
+      <div class="div"></div>
+      <button type="button" id="tFit" title="Enquadrar"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Enquadrar</span></button>
+      <button type="button" id="tUndo" title="Desfazer" disabled><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg><span>Desfazer</span></button>
+    </div>
+    <div class="info">
+      <span class="tag name" id="infoName">—</span>
+      <span class="tag" id="infoDims">—</span>
+      <span class="tag" id="infoTris">—</span>
+    </div>
+    <div class="axes" aria-hidden="true"><i class="x">X</i><i class="y">Y</i><i class="z">Z ↑</i> mm</div>
+    <div class="progress" id="progress" hidden>
+      <div class="pcard" role="status" aria-live="polite">
+        <h4 id="pTitle">Gerando modelo</h4>
+        <ul class="steps" id="pSteps"></ul>
+        <div class="bar"><i id="pBar"></i></div>
+        <p class="pnote" id="pNote"></p>
+        <div class="pfoot"><span id="pPct">0%</span><button class="btn ghost" id="pCancel" type="button">Cancelar</button></div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="panel right">
+    <section class="sec">
+      <h3>Dimensões (mm)</h3>
+      <div class="dims">
+        <div class="dim"><label for="dimX"><i style="background:#ff7b72"></i>X</label><input id="dimX" type="number" step="0.1" min="0.1"></div>
+        <div class="dim"><label for="dimY"><i style="background:#7ee787"></i>Y</label><input id="dimY" type="number" step="0.1" min="0.1"></div>
+        <div class="dim"><label for="dimZ"><i style="background:#79c0ff"></i>Z</label><input id="dimZ" type="number" step="0.1" min="0.1"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="lockScale" checked> Manter proporções</label>
+      <div class="grid3">
+        <button class="btn" type="button" data-rot="x">Girar X</button>
+        <button class="btn" type="button" data-rot="y">Girar Y</button>
+        <button class="btn" type="button" data-rot="z">Girar Z</button>
+      </div>
+      <button class="btn" type="button" id="btnMirror">Espelhar (X)</button>
+    </section>
+
+    <section class="sec">
+      <h3>Recortar base plana</h3>
+      <label class="field"><span>Altura do corte <output id="cutOut">2,0 mm</output></span><input type="range" id="cutH" min="0" max="40" step="0.5" value="2"></label>
+      <button class="btn" type="button" id="btnCut">Cortar e fechar a base</button>
+    </section>
+
+    <section class="sec">
+      <h3>Malha</h3>
+      <div id="waterPill"></div>
+      <dl class="stats">
+        <dt>Triângulos</dt><dd id="stTris">—</dd>
+        <dt>Bordas abertas</dt><dd id="stOpen">—</dd>
+        <dt>Arestas não-manifold</dt><dd id="stNonMan">—</dd>
+        <dt>Partes separadas</dt><dd id="stParts">—</dd>
+        <dt>Volume</dt><dd id="stVol">—</dd>
+        <dt>Área de superfície</dt><dd id="stArea">—</dd>
+        <dt>Área com saliência &gt;45°</dt><dd id="stOver">—</dd>
+      </dl>
+      <div class="grid2">
+        <button class="btn" type="button" id="btnRepair">Reparar malha</button>
+        <button class="btn" type="button" id="btnSmooth">Suavizar</button>
+      </div>
+      <button class="btn" type="button" id="btnIslands">Remover pedaços soltos</button>
+    </section>
+
+    <section class="sec">
+      <h3>Impressão</h3>
+      <div class="grid2">
+        <label class="field"><span>Impressora</span><select id="selPrinter"></select></label>
+        <label class="field"><span>Material</span><select id="selMat"><option value="1.24">PLA</option><option value="1.27">PETG</option><option value="1.04">ABS</option><option value="1.21">TPU</option></select></label>
+      </div>
+      <div class="grid3">
+        <label class="field"><span>Camada</span><select id="selLayer"><option>0.12</option><option selected>0.20</option><option>0.28</option></select></label>
+        <label class="field"><span>Preench. %</span><input id="inInfill" type="number" value="15" min="0" max="100"></label>
+        <label class="field"><span>Paredes</span><input id="inWalls" type="number" value="2" min="1" max="8"></label>
+      </div>
+      <div id="fitPill"></div>
+      <div class="est">
+        <div><b id="esGrams">—</b><span>filamento</span></div>
+        <div><b id="esMeters">—</b><span>comprimento</span></div>
+        <div><b id="esTime">—</b><span>tempo aprox.</span></div>
+      </div>
+      <p class="hint">Estimativa simplificada (paredes + preenchimento, sem suportes). O fatiador dá o valor final.</p>
+    </section>
+
+    <section class="sec">
+      <h3>Exportar</h3>
+      <div class="exp">
+        <button class="btn primary" type="button" data-exp="stl">STL<small>impressão 3D</small></button>
+        <button class="btn" type="button" data-exp="3mf">3MF<small>Bambu, Prusa, Cura</small></button>
+        <button class="btn" type="button" data-exp="obj">OBJ<small>com cores</small></button>
+        <button class="btn" type="button" data-exp="glb">GLB<small>web, AR, jogos</small></button>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="dlgApi">
+  <form method="dialog">
+    <h2>Sobre a IA</h2>
+    <dl class="stats">
+      <dt>IA no aparelho</dt><dd>grátis, sem limite</dd>
+      <dt>Modo rápido</dt><dd>grátis, sem limite</dd>
+      <dt>IA na nuvem</dt><dd>1 crédito por modelo</dd>
+    </dl>
+    <p class="hint">Baixe a IA do aparelho com Wi-Fi para usá-la depois sem internet.</p>
+    <button class="btn" id="btnPreload" type="button">Baixar a IA do aparelho agora (~70 MB)</button>
+    <p class="hint">Powered by Tencent Hunyuan. Também usa TRELLIS (Microsoft), FLUX.1-schnell, Depth Anything V2 e ORMBG. <a href="licencas.html" target="_blank" rel="noopener">Licenças</a> · <a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a> · <a href="privacidade.html" target="_blank" rel="noopener">Privacidade</a></p>
+    <div class="row"><button class="btn ghost" value="cancel">Fechar</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgAccount">
+  <div class="dlg">
+    <h2 id="accTitle">Entrar no 3D Maker AI</h2>
+    <p class="lede" id="accMsg"></p>
+    <div id="accOut" class="dlg">
+      <div class="seg" role="radiogroup" aria-label="Entrar ou criar conta">
+        <label><input type="radio" name="accMode" value="in" checked>Entrar</label>
+        <label><input type="radio" name="accMode" value="up">Criar conta</label>
+      </div>
+      <label class="field"><span>E-mail</span><input id="accEmail" type="email" autocomplete="email" inputmode="email"></label>
+      <label class="field"><span>Senha</span><input id="accPass" type="password" autocomplete="current-password" minlength="6"></label>
+      <p class="hint" id="accUpNote" hidden>Ao criar a conta você ganha créditos de boas-vindas e concorda com os <a href="termos.html" target="_blank" rel="noopener">Termos de Uso</a> e a <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</p>
+      <button class="btn primary wide" id="accGo" type="button">Entrar</button>
+      <button class="btn ghost" id="accForgot" type="button">Esqueci a senha</button>
+    </div>
+    <div id="accReset" class="dlg" hidden>
+      <label class="field"><span>Nova senha</span><input id="accNewPass" type="password" autocomplete="new-password" minlength="6"></label>
+      <button class="btn primary wide" id="accSetPass" type="button">Salvar nova senha</button>
+    </div>
+    <div id="accIn" class="dlg" hidden>
+      <dl class="stats">
+        <dt>E-mail</dt><dd id="accEmailV"></dd>
+        <dt>Créditos</dt><dd id="accCreditsV"></dd>
+        <dt>Plano</dt><dd id="accPlanV"></dd>
+      </dl>
+      <p class="hint">Compra de créditos: em breve. A IA do aparelho e o modo rápido são grátis e sem limite.</p>
+      <h3>Extrato</h3>
+      <div class="ledger" id="accLedger"></div>
+      <div id="accAdmin" class="dlg admin" hidden>
+        <h3>Painel do administrador</h3>
+        <div class="grid2">
+          <input id="admEmail" type="email" placeholder="e-mail do usuário" aria-label="E-mail do usuário">
+          <input id="admAmount" type="number" value="10" aria-label="Quantidade de créditos">
+        </div>
+        <button class="btn" id="admGrant" type="button">Adicionar créditos (negativo para remover)</button>
+        <input id="admSearch" type="text" placeholder="Buscar usuário por e-mail" aria-label="Buscar usuário">
+        <div class="ledger" id="admList"></div>
+      </div>
+      <button class="btn ghost" id="accLogout" type="button">Sair da conta</button>
+    </div>
+    <div class="row"><button class="btn ghost" type="button" id="accClose">Fechar</button></div>
+  </div>
+</dialog>
+
+<dialog id="dlgConsent">
+  <div class="dlg">
+    <h2>Enviar para a IA na nuvem?</h2>
+    <p class="lede">Para gerar na nuvem, sua foto ou descrição é enviada aos nossos servidores e a servidores de IA de terceiros (Hugging Face). Elas são usadas só para gerar o seu modelo. Saiba mais na <a href="privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</p>
+    <p class="hint">Se preferir que nada saia do aparelho, use a <b>IA no aparelho</b>.</p>
+    <div class="row"><button class="btn ghost" type="button" id="consentNo">Cancelar</button><button class="btn primary" type="button" id="consentYes">Concordo, continuar</button></div>
+  </div>
+</dialog>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { ThreeMFLoader } from 'three/addons/loaders/3MFLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { zipSync, strToU8 } from 'fflate';
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+// Cede a vez ao navegador para atualizar a barra de progresso (setTimeout segue rodando em segundo plano, rAF não)
+const frame = () => new Promise(r => setTimeout(r, 0));
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const nf = (v, d = 1) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+const PRINTERS = {
+  'Bambu Lab A1 / P1S / X1C': [256, 256, 256],
+  'Bambu Lab A1 mini': [180, 180, 180],
+  'Prusa MK4': [250, 210, 220],
+  'Prusa MINI+': [180, 180, 180],
+  'Creality Ender-3 V3': [220, 220, 250],
+  'Creality K1 Max': [300, 300, 300],
+  'Elegoo Neptune 4': [225, 225, 265],
+};
+
+const S = { rep: null, name: '', undo: [], history: [], cur: -1, colors: true, wire: false, over: false, cancel: false, api: { proxy: false, key: '' } };
+
+
+/* ---------- UI básicos ---------- */
+let toastT;
+function toast(msg, kind = '') {
+  const t = $('#toast'); t.textContent = msg; t.className = 'toast show ' + kind;
+  clearTimeout(toastT); toastT = setTimeout(() => t.className = 'toast', kind === 'bad' ? 6500 : 3200);
+}
+const pnote = t => { $('#pNote').textContent = t || ''; };
+function progressOpen(title, steps) {
+  S.cancel = false; $('#pTitle').textContent = title; pnote('');
+  $('#pSteps').innerHTML = steps.map(s => `<li>${s}</li>`).join('');
+  $('#progress').hidden = false; progress(0, 0);
+}
+function progress(step, frac) {
+  $$('#pSteps li').forEach((li, i) => li.className = i < step ? 'done' : i === step ? 'now' : '');
+  const n = $$('#pSteps li').length || 1, pct = Math.round(((step + Math.min(1, frac)) / n) * 100);
+  $('#pBar').style.width = pct + '%'; $('#pPct').textContent = pct + '%';
+}
+const progressClose = () => { $('#progress').hidden = true; };
+const checkCancel = () => { if (S.cancel) throw new Error('cancelado'); };
+$('#pCancel').onclick = () => { S.cancel = true; };
+
+/* ---------- Visualizador 3D ---------- */
+const host = $('#viewport');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
+host.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 0.5, 6000);
+camera.position.set(170, 140, 210);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.autoRotateSpeed = 2.4;
+scene.add(new THREE.HemisphereLight(0xe3ebff, 0x1d1712, 1.15));
+const keyL = new THREE.DirectionalLight(0xffffff, 1.7); keyL.position.set(120, 240, 160); scene.add(keyL);
+const rimL = new THREE.DirectionalLight(0xffc68a, 0.7); rimL.position.set(-180, 90, -140); scene.add(rimL);
+const bed = new THREE.Group(); scene.add(bed);
+const material = new THREE.MeshStandardMaterial({ color: 0xd6dbe2, roughness: 0.55, metalness: 0.04 });
+const meshObj = new THREE.Mesh(new THREE.BufferGeometry(), material);
+scene.add(meshObj);
+let bedBox;
+
+function resize() {
+  const r = host.getBoundingClientRect(); if (!r.width || !r.height) return;
+  renderer.setSize(r.width, r.height, false); camera.aspect = r.width / r.height; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(host);
+(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+
+function printerDims() { return PRINTERS[$('#selPrinter').value] || [256, 256, 256]; }
+function buildBed() {
+  bed.clear();
+  const [bx, by, bz] = printerDims(), m = Math.max(bx, by);
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(bx, by).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x161a20 }));
+  plate.position.y = -0.2; bed.add(plate);
+  const grid = new THREE.GridHelper(m, Math.round(m / 10), 0x39404b, 0x232830);
+  grid.scale.set(bx / m, 1, by / m); grid.position.y = -0.1; bed.add(grid);
+  bedBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(bx, bz, by)), new THREE.LineBasicMaterial({ color: 0x3a414c, transparent: true, opacity: 0.6 }));
+  bedBox.position.y = bz / 2; bed.add(bedBox);
+}
+function fitView() {
+  if (!S.rep) return;
+  const b = bbox(S.rep), sz = Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+  const target = new THREE.Vector3(0, (b.max[1] - b.min[1]) / 2, 0);
+  const dir = new THREE.Vector3(0.72, 0.5, 0.95).normalize();
+  controls.target.copy(target); camera.position.copy(target).addScaledVector(dir, sz * 2.3 + 20);
+  controls.update();
+}
+
+/* ---------- Representação de malha: {pos, col (sRGB 0..1) | null, idx} ---------- */
+function bbox(rep) {
+  const p = rep.pos, min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < p.length; i += 3) for (let k = 0; k < 3; k++) { const v = p[i + k]; if (v < min[k]) min[k] = v; if (v > max[k]) max[k] = v; }
+  return { min, max };
+}
+const cloneRep = r => ({ pos: r.pos.slice(), col: r.col ? r.col.slice() : null, idx: r.idx.slice() });
+function placeOnBed(rep) {
+  const b = bbox(rep), cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2, p = rep.pos;
+  for (let i = 0; i < p.length; i += 3) { p[i] -= cx; p[i + 1] -= b.min[1]; p[i + 2] -= cz; }
+  return rep;
+}
+function scaleRep(rep, sx, sy, sz) {
+  const p = rep.pos; for (let i = 0; i < p.length; i += 3) { p[i] *= sx; p[i + 1] *= sy; p[i + 2] *= sz; }
+  if (sx * sy * sz < 0) flipAll(rep);
+  return rep;
+}
+function flipAll(rep) { const x = rep.idx; for (let t = 0; t < x.length; t += 3) { const a = x[t + 1]; x[t + 1] = x[t + 2]; x[t + 2] = a; } }
+function applyMatrix(rep, m) {
+  const v = new THREE.Vector3(), p = rep.pos;
+  for (let i = 0; i < p.length; i += 3) { v.set(p[i], p[i + 1], p[i + 2]).applyMatrix4(m); p[i] = v.x; p[i + 1] = v.y; p[i + 2] = v.z; }
+  if (m.determinant() < 0) flipAll(rep);
+  return rep;
+}
+function fitHeight(rep, h) { const b = bbox(rep), s = h / Math.max(1e-6, b.max[1] - b.min[1]); return placeOnBed(scaleRep(rep, s, s, s)); }
+
+function compact(rep) {
+  const nV = rep.pos.length / 3, map = new Int32Array(nV).fill(-1); let n = 0;
+  for (const i of rep.idx) if (map[i] < 0) map[i] = n++;
+  const pos = new Float32Array(n * 3), col = rep.col ? new Float32Array(n * 3) : null;
+  for (let i = 0; i < nV; i++) { const j = map[i]; if (j < 0) continue; for (let k = 0; k < 3; k++) { pos[3 * j + k] = rep.pos[3 * i + k]; if (col) col[3 * j + k] = rep.col[3 * i + k]; } }
+  const idx = new Uint32Array(rep.idx.length); for (let i = 0; i < idx.length; i++) idx[i] = map[rep.idx[i]];
+  return { pos, col, idx };
+}
+function cleanTris(rep) {
+  const { pos, idx } = rep, out = [], seen = new Set();
+  // "área zero" relativa ao tamanho do modelo: vale para malhas em mm e em metros
+  const bb = bbox(rep), diag2 = (bb.max[0] - bb.min[0]) ** 2 + (bb.max[1] - bb.min[1]) ** 2 + (bb.max[2] - bb.min[2]) ** 2, eps = (diag2 * 1e-13) ** 2;
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+    if (a === b || b === c || a === c) continue;
+    const ux = pos[3 * b] - pos[3 * a], uy = pos[3 * b + 1] - pos[3 * a + 1], uz = pos[3 * b + 2] - pos[3 * a + 2];
+    const vx = pos[3 * c] - pos[3 * a], vy = pos[3 * c + 1] - pos[3 * a + 1], vz = pos[3 * c + 2] - pos[3 * a + 2];
+    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+    if (cx * cx + cy * cy + cz * cz <= eps) continue;
+    const s = a < b ? (b < c ? [a, b, c] : a < c ? [a, c, b] : [c, a, b]) : (a < c ? [b, a, c] : b < c ? [b, c, a] : [c, b, a]);
+    const key = s[0] + ',' + s[1] + ',' + s[2];
+    if (seen.has(key)) continue; seen.add(key); out.push(a, b, c);
+  }
+  return compact({ pos, col: rep.col, idx: Uint32Array.from(out) });
+}
+// Sopa de triângulos (não indexada) → malha indexada soldando vértices coincidentes
+function weld(p, c) {
+  const n = p.length / 3; let mn = Infinity, mx = -Infinity;
+  for (let i = 0; i < p.length; i++) { if (p[i] < mn) mn = p[i]; if (p[i] > mx) mx = p[i]; }
+  const q = 1 / Math.max(1e-9, (mx - mn) * 1e-6), map = new Map(), pos = [], col = c ? [] : null, idx = new Uint32Array(n);
+  for (let i = 0; i < n; i++) {
+    const k = Math.round(p[3 * i] * q) + ',' + Math.round(p[3 * i + 1] * q) + ',' + Math.round(p[3 * i + 2] * q);
+    let v = map.get(k);
+    if (v === undefined) { v = pos.length / 3; map.set(k, v); pos.push(p[3 * i], p[3 * i + 1], p[3 * i + 2]); if (col) col.push(c[3 * i], c[3 * i + 1], c[3 * i + 2]); }
+    idx[i] = v;
+  }
+  return cleanTris({ pos: new Float32Array(pos), col: col ? new Float32Array(col) : null, idx });
+}
+function vertexNormals(rep) {
+  const { pos, idx } = rep, n = new Float32Array(pos.length);
+  for (let t = 0; t < idx.length; t += 3) {
+    const a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
+    const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+    const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+    for (const o of [a, b, c]) { n[o] += cx; n[o + 1] += cy; n[o + 2] += cz; }
+  }
+  for (let i = 0; i < n.length; i += 3) { const l = Math.hypot(n[i], n[i + 1], n[i + 2]) || 1; n[i] /= l; n[i + 1] /= l; n[i + 2] /= l; }
+  return n;
+}
+function makeUF(n) {
+  const par = new Int32Array(n); for (let i = 0; i < n; i++) par[i] = i;
+  const find = x => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+  return { find, union: (a, b) => { a = find(a); b = find(b); if (a !== b) par[a] = b; } };
+}
+function analyze(rep) {
+  const { pos, idx } = rep, nV = pos.length / 3, nT = idx.length / 3, b = bbox(rep), em = new Map();
+  let vol = 0, area = 0, over = 0;
+  for (let t = 0; t < idx.length; t += 3) {
+    const ia = idx[t], ib = idx[t + 1], ic = idx[t + 2];
+    for (const [x, y] of [[ia, ib], [ib, ic], [ic, ia]]) { const k = x < y ? x * nV + y : y * nV + x; em.set(k, (em.get(k) || 0) + 1); }
+    const a = ia * 3, bb = ib * 3, c = ic * 3;
+    const ax = pos[a], ay = pos[a + 1], az = pos[a + 2], bx = pos[bb], by = pos[bb + 1], bz = pos[bb + 2], cx = pos[c], cy = pos[c + 1], cz = pos[c + 2];
+    const ux = bx - ax, uy = by - ay, uz = bz - az, vx = cx - ax, vy = cy - ay, vz = cz - az;
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, len = Math.hypot(nx, ny, nz);
+    area += len / 2;
+    vol += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx) + az * (bx * cy - by * cx)) / 6;
+    if (len > 0 && ny / len < -0.7071 && Math.min(ay, by, cy) > b.min[1] + 0.4) over += len / 2;
+  }
+  let open = 0, nonman = 0; for (const v of em.values()) { if (v === 1) open++; else if (v > 2) nonman++; }
+  const uf = makeUF(nV); for (let t = 0; t < idx.length; t += 3) { uf.union(idx[t], idx[t + 1]); uf.union(idx[t], idx[t + 2]); }
+  const roots = new Set(); for (let i = 0; i < nV; i++) roots.add(uf.find(i));
+  return { nT, nV, open, nonman, parts: roots.size, vol: Math.abs(vol), signedVol: vol, area, over, size: [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]] };
+}
+
+/* ---------- Reparo de malha ---------- */
+function orient(rep) {
+  const idx = rep.idx, nT = idx.length / 3, nV = rep.pos.length / 3, em = new Map();
+  for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) {
+    const a = idx[3 * t + k], b = idx[3 * t + (k + 1) % 3], key = a < b ? a * nV + b : b * nV + a;
+    const l = em.get(key); if (l) l.push(t); else em.set(key, [t]);
+  }
+  const hasDir = (t, a, b) => { for (let k = 0; k < 3; k++) if (idx[3 * t + k] === a && idx[3 * t + (k + 1) % 3] === b) return true; return false; };
+  const flip = t => { const s = idx[3 * t + 1]; idx[3 * t + 1] = idx[3 * t + 2]; idx[3 * t + 2] = s; };
+  const seen = new Uint8Array(nT), comp = new Int32Array(nT), vols = [], stack = [];
+  for (let s = 0; s < nT; s++) {
+    if (seen[s]) continue; const c = vols.length; vols.push(0); seen[s] = 1; comp[s] = c; stack.push(s);
+    while (stack.length) {
+      const t = stack.pop();
+      for (let k = 0; k < 3; k++) {
+        const a = idx[3 * t + k], b = idx[3 * t + (k + 1) % 3], l = em.get(a < b ? a * nV + b : b * nV + a);
+        if (!l || l.length !== 2) continue;
+        const u = l[0] === t ? l[1] : l[0]; if (seen[u]) continue;
+        if (hasDir(u, a, b)) flip(u);
+        seen[u] = 1; comp[u] = c; stack.push(u);
+      }
+    }
+  }
+  const p = rep.pos;
+  for (let t = 0; t < nT; t++) {
+    const a = idx[3 * t] * 3, b = idx[3 * t + 1] * 3, c = idx[3 * t + 2] * 3;
+    vols[comp[t]] += p[a] * (p[b + 1] * p[c + 2] - p[b + 2] * p[c + 1]) - p[a + 1] * (p[b] * p[c + 2] - p[b + 2] * p[c]) + p[a + 2] * (p[b] * p[c + 1] - p[b + 1] * p[c]);
+  }
+  for (let t = 0; t < nT; t++) if (vols[comp[t]] < 0) flip(t);
+  return rep;
+}
+function fillHoles(rep) {
+  const { idx } = rep, nV = rep.pos.length / 3, cnt = new Map();
+  for (let t = 0; t < idx.length; t += 3) for (let k = 0; k < 3; k++) {
+    const a = idx[t + k], b = idx[t + (k + 1) % 3], key = a < b ? a * nV + b : b * nV + a; cnt.set(key, (cnt.get(key) || 0) + 1);
+  }
+  // borda a→b existente ⇒ o furo percorre b→a. Um vértice pode ter várias saídas quando dois furos se tocam num ponto.
+  const next = new Map(), usedE = new Set();
+  for (let t = 0; t < idx.length; t += 3) for (let k = 0; k < 3; k++) {
+    const a = idx[t + k], b = idx[t + (k + 1) % 3];
+    if (cnt.get(a < b ? a * nV + b : b * nV + a) === 1) (next.get(b) || next.set(b, []).get(b)).push(a);
+  }
+  const takeEdge = v => { const l = next.get(v); if (!l) return undefined; for (const w of l) { const k = v * nV + w; if (!usedE.has(k)) { usedE.add(k); return w; } } return undefined; };
+  const pos = Array.from(rep.pos), col = rep.col ? Array.from(rep.col) : null, out = Array.from(idx);
+  let filled = 0;
+  for (const start of next.keys()) {
+    for (;;) { // cada saída ainda livre deste vértice começa um contorno
+      const loop = [start]; let v = takeEdge(start), ok = false;
+      if (v === undefined) break;
+      while (loop.length < 20000) {
+        if (v === start) { ok = true; break; }
+        const seen = loop.indexOf(v);
+        if (seen > 0) { loop.splice(0, seen); ok = true; break; } // laço menor dentro do contorno
+        loop.push(v); v = takeEdge(v); if (v === undefined) break;
+      }
+      if (!ok || loop.length < 3) continue;
+    const c = pos.length / 3; let cx = 0, cy = 0, cz = 0, r = 0, g = 0, bl = 0;
+    for (const i of loop) { cx += pos[3 * i]; cy += pos[3 * i + 1]; cz += pos[3 * i + 2]; if (col) { r += col[3 * i]; g += col[3 * i + 1]; bl += col[3 * i + 2]; } }
+    const n = loop.length; pos.push(cx / n, cy / n, cz / n); if (col) col.push(r / n, g / n, bl / n);
+    for (let i = 0; i < n; i++) out.push(loop[i], loop[(i + 1) % n], c);
+    filled++;
+    }
+  }
+  return { rep: { pos: new Float32Array(pos), col: col ? new Float32Array(col) : null, idx: Uint32Array.from(out) }, filled };
+}
+// Remove partes pequenas (em triângulos) e partes sem volume, como faces soltas
+function removeIslands(rep, frac = 0.03) {
+  const { idx, pos } = rep, nV = pos.length / 3, uf = makeUF(nV);
+  for (let t = 0; t < idx.length; t += 3) { uf.union(idx[t], idx[t + 1]); uf.union(idx[t], idx[t + 2]); }
+  const size = new Map(), vol = new Map();
+  for (let t = 0; t < idx.length; t += 3) {
+    const r = uf.find(idx[t]), a = idx[t] * 3, b = idx[t + 1] * 3, c = idx[t + 2] * 3;
+    size.set(r, (size.get(r) || 0) + 1);
+    vol.set(r, (vol.get(r) || 0) + pos[a] * (pos[b + 1] * pos[c + 2] - pos[b + 2] * pos[c + 1]) - pos[a + 1] * (pos[b] * pos[c + 2] - pos[b + 2] * pos[c]) + pos[a + 2] * (pos[b] * pos[c + 1] - pos[b + 1] * pos[c]));
+  }
+  const big = Math.max(...size.values()), bigVol = Math.max(...[...vol.values()].map(Math.abs));
+  const keep = r => size.get(r) >= big * frac && Math.abs(vol.get(r)) >= bigVol * 1e-4;
+  const out = [];
+  for (let t = 0; t < idx.length; t += 3) if (keep(uf.find(idx[t]))) out.push(idx[t], idx[t + 1], idx[t + 2]);
+  return { rep: compact({ pos, col: rep.col, idx: Uint32Array.from(out) }), removed: [...size.keys()].filter(r => !keep(r)).length };
+}
+function taubin(rep, iters = 6, lam = 0.5, mu = -0.53) {
+  const { pos, idx } = rep, nV = pos.length / 3, deg = new Int32Array(nV + 1);
+  for (let t = 0; t < idx.length; t += 3) for (let k = 0; k < 3; k++) deg[idx[t + k] + 1] += 2;
+  for (let i = 0; i < nV; i++) deg[i + 1] += deg[i];
+  const nb = new Int32Array(deg[nV]), fill = deg.slice(0, nV);
+  for (let t = 0; t < idx.length; t += 3) for (let k = 0; k < 3; k++) {
+    const a = idx[t + k], b = idx[t + (k + 1) % 3], c = idx[t + (k + 2) % 3]; nb[fill[a]++] = b; nb[fill[a]++] = c;
+  }
+  const tmp = new Float32Array(pos.length);
+  for (let it = 0; it < iters * 2; it++) {
+    const f = it % 2 ? mu : lam;
+    for (let i = 0; i < nV; i++) {
+      const s = deg[i], e = deg[i + 1]; if (e === s) { tmp[3 * i] = pos[3 * i]; tmp[3 * i + 1] = pos[3 * i + 1]; tmp[3 * i + 2] = pos[3 * i + 2]; continue; }
+      let x = 0, y = 0, z = 0; for (let j = s; j < e; j++) { const o = nb[j] * 3; x += pos[o]; y += pos[o + 1]; z += pos[o + 2]; }
+      const m = 1 / (e - s);
+      tmp[3 * i] = pos[3 * i] + f * (x * m - pos[3 * i]); tmp[3 * i + 1] = pos[3 * i + 1] + f * (y * m - pos[3 * i + 1]); tmp[3 * i + 2] = pos[3 * i + 2] + f * (z * m - pos[3 * i + 2]);
+    }
+    pos.set(tmp);
+  }
+  return rep;
+}
+function repairAll(rep) {
+  let r = cleanTris(rep); orient(r);
+  let filled = 0;
+  for (let pass = 0; pass < 3; pass++) { // furos que se tocam podem precisar de mais de uma passada
+    const h = fillHoles(r); r = h.rep; filled += h.filled;
+    if (!h.filled) break;
+    r = cleanTris(r); orient(r);
+  }
+  const isl = removeIslands(r, 0.01); r = isl.rep;
+  return { rep: r, filled, removed: isl.removed };
+}
+
+/* ---------- Corte plano com tampa ---------- */
+function cutBelow(rep, c) {
+  const { idx } = rep, src = rep.pos;
+  for (let i = 1; i < src.length; i += 3) if (Math.abs(src[i] - c) < 1e-5) { c += 2e-4; i = -2; }
+  const pos = Array.from(src), col = rep.col ? Array.from(rep.col) : null, nV = src.length / 3;
+  const cache = new Map(), out = [], segs = [];
+  const I = (a, b) => {
+    const key = a < b ? a * nV + b : b * nV + a; let v = cache.get(key); if (v !== undefined) return v;
+    const [p, q] = a < b ? [a, b] : [b, a], t = (c - src[3 * p + 1]) / (src[3 * q + 1] - src[3 * p + 1]);
+    v = pos.length / 3; for (let k = 0; k < 3; k++) pos.push(src[3 * p + k] + t * (src[3 * q + k] - src[3 * p + k]));
+    if (col) for (let k = 0; k < 3; k++) col.push(rep.col[3 * p + k] + t * (rep.col[3 * q + k] - rep.col[3 * p + k]));
+    cache.set(key, v); return v;
+  };
+  for (let t = 0; t < idx.length; t += 3) {
+    const v = [idx[t], idx[t + 1], idx[t + 2]], up = v.map(i => src[3 * i + 1] >= c), n = up.filter(Boolean).length;
+    if (n === 3) { out.push(...v); continue; } if (n === 0) continue;
+    for (let k = 0; k < 3; k++) {
+      const p = v[k], q = v[(k + 1) % 3], r = v[(k + 2) % 3];
+      if (n === 1 && up[k]) { const a = I(p, q), b = I(r, p); out.push(p, a, b); segs.push([a, b]); }
+      if (n === 2 && !up[(k + 2) % 3] && up[k] && up[(k + 1) % 3]) { const a = I(q, r), b = I(r, p); out.push(p, q, a, p, a, b); segs.push([a, b]); }
+    }
+  }
+  // Une os segmentos em contornos fechados e tampa cada um (com furos)
+  const adj = new Map(); for (const [a, b] of segs) { (adj.get(a) || adj.set(a, []).get(a)).push(b); (adj.get(b) || adj.set(b, []).get(b)).push(a); }
+  const usedSeg = new Set(), loops = [];
+  for (const s of adj.keys()) {
+    if (usedSeg.has(s)) continue; const loop = [s]; usedSeg.add(s); let prev = -1, cur = s;
+    for (;;) { const nx = (adj.get(cur) || []).find(x => x !== prev && (!usedSeg.has(x) || (x === s && loop.length > 2))); if (nx === undefined || nx === s) break; loop.push(nx); usedSeg.add(nx); prev = cur; cur = nx; }
+    if (loop.length >= 3) loops.push(loop);
+  }
+  const pts = l => l.map(i => new THREE.Vector2(pos[3 * i], pos[3 * i + 2]));
+  const inside = (pt, poly) => { let o = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a.y > pt.y) !== (b.y > pt.y) && pt.x < (b.x - a.x) * (pt.y - a.y) / (b.y - a.y) + a.x) o = !o; } return o; };
+  const L = loops.map(l => ({ l, p: pts(l), area: Math.abs(THREE.ShapeUtils.area(pts(l))) })).sort((a, b) => b.area - a.area);
+  L.forEach((x, i) => { x.parent = -1; for (let j = i - 1; j >= 0; j--) if (inside(x.p[0], L[j].p)) { x.parent = j; break; } x.depth = x.parent < 0 ? 0 : L[x.parent].depth + 1; });
+  L.forEach((x, i) => {
+    if (x.depth % 2) return;
+    const holes = L.filter(h => h.parent === i);
+    const all = [x.l, ...holes.map(h => h.l)].flat();
+    for (const f of THREE.ShapeUtils.triangulateShape(x.p, holes.map(h => h.p))) {
+      const a = all[f[0]], b = all[f[1]], d = all[f[2]];
+      const ux = pos[3 * b] - pos[3 * a], uz = pos[3 * b + 2] - pos[3 * a + 2], vx = pos[3 * d] - pos[3 * a], vz = pos[3 * d + 2] - pos[3 * a + 2];
+      if (uz * vx - ux * vz > 0) out.push(a, d, b); else out.push(a, b, d); // normal da tampa apontando para baixo
+    }
+  });
+  return { rep: cleanTris({ pos: new Float32Array(pos), col: col ? new Float32Array(col) : null, idx: Uint32Array.from(out) }), loops: L.length };
+}
+
+/* ---------- Voxels → malha ---------- */
+function blurVoxels(vox, nx, ny, nz) {
+  let f = Float32Array.from(vox), g = new Float32Array(f.length);
+  const id = (x, y, z) => x + nx * (y + ny * z);
+  const pass = (dx, dy, dz) => {
+    for (let z = 0; z < nz; z++) for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+      let s = f[id(x, y, z)], n = 1;
+      const x0 = x - dx, y0 = y - dy, z0 = z - dz, x1 = x + dx, y1 = y + dy, z1 = z + dz;
+      if (x0 >= 0 && y0 >= 0 && z0 >= 0) { s += f[id(x0, y0, z0)]; n++; } else n++;
+      if (x1 < nx && y1 < ny && z1 < nz) { s += f[id(x1, y1, z1)]; n++; } else n++;
+      g[id(x, y, z)] = s / n;
+    }
+    [f, g] = [g, f];
+  };
+  pass(1, 0, 0); pass(0, 1, 0); pass(0, 0, 1);
+  const out = new Uint8Array(vox.length); for (let i = 0; i < f.length; i++) out[i] = f[i] > 0.5 ? 1 : 0;
+  return out;
+}
+function voxelsToMesh(vox, nx, ny, nz) {
+  const vid = new Int32Array((nx + 1) * (ny + 1) * (nz + 1)).fill(-1), pos = [], idx = [];
+  const V = (x, y, z) => { const k = x + (nx + 1) * (y + (ny + 1) * z); let v = vid[k]; if (v < 0) { v = pos.length / 3; vid[k] = v; pos.push(x, y, z); } return v; };
+  const F = (x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < nx && y < ny && z < nz && vox[x + nx * (y + ny * z)];
+  const Q = (a, b, c, d) => idx.push(a, b, c, a, c, d);
+  for (let z = 0; z < nz; z++) for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+    if (!vox[x + nx * (y + ny * z)]) continue;
+    if (!F(x - 1, y, z)) Q(V(x, y, z), V(x, y, z + 1), V(x, y + 1, z + 1), V(x, y + 1, z));
+    if (!F(x + 1, y, z)) Q(V(x + 1, y, z), V(x + 1, y + 1, z), V(x + 1, y + 1, z + 1), V(x + 1, y, z + 1));
+    if (!F(x, y - 1, z)) Q(V(x, y, z), V(x + 1, y, z), V(x + 1, y, z + 1), V(x, y, z + 1));
+    if (!F(x, y + 1, z)) Q(V(x, y + 1, z), V(x, y + 1, z + 1), V(x + 1, y + 1, z + 1), V(x + 1, y + 1, z));
+    if (!F(x, y, z - 1)) Q(V(x, y, z), V(x, y + 1, z), V(x + 1, y + 1, z), V(x + 1, y, z));
+    if (!F(x, y, z + 1)) Q(V(x, y, z + 1), V(x + 1, y, z + 1), V(x + 1, y + 1, z + 1), V(x, y + 1, z + 1));
+  }
+  return { pos: new Float32Array(pos), col: null, idx: Uint32Array.from(idx) };
+}
+
+/* ---------- Imagens e recorte de fundo ---------- */
+async function loadIm(file, maxDim = 420) {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const s = Math.min(1, maxDim / Math.max(bmp.width, bmp.height)), w = Math.max(1, Math.round(bmp.width * s)), h = Math.max(1, Math.round(bmp.height * s));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(bmp, 0, 0, w, h);
+  return { w, h, data: x.getImageData(0, 0, w, h).data, canvas: c, file };
+}
+function otsu(vals) {
+  const H = new Float64Array(256); let mx = 1e-6; for (const v of vals) if (v > mx) mx = v;
+  for (const v of vals) H[Math.min(255, (v / mx * 255) | 0)]++;
+  let sum = 0, tot = vals.length; for (let i = 0; i < 256; i++) sum += i * H[i];
+  let sB = 0, wB = 0, best = 0, th = 0;
+  for (let i = 0; i < 256; i++) { wB += H[i]; if (!wB) continue; const wF = tot - wB; if (!wF) break; sB += i * H[i]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) ** 2; if (v > best) { best = v; th = i; } }
+  return (th + 0.5) / 255 * mx;
+}
+function segment(im, thr) {
+  const { w, h, data } = im, n = w * h; let mask = new Uint8Array(n), transp = 0, used = 0;
+  for (let i = 0; i < n; i++) if (data[4 * i + 3] < 128) transp++;
+  if (transp > n * 0.03) { for (let i = 0; i < n; i++) mask[i] = data[4 * i + 3] >= 128 ? 1 : 0; used = -1; }
+  else {
+    const R = [], G = [], B = [], add = i => { R.push(data[4 * i]); G.push(data[4 * i + 1]); B.push(data[4 * i + 2]); };
+    for (let x = 0; x < w; x++) { add(x); add(x + w * (h - 1)); }
+    for (let y = 0; y < h; y++) { add(w * y); add(w - 1 + w * y); }
+    const med = a => a.sort((p, q) => p - q)[a.length >> 1], br = med(R), bg = med(G), bb = med(B);
+    const d = new Float32Array(n);
+    for (let i = 0; i < n; i++) d[i] = Math.hypot(data[4 * i] - br, data[4 * i + 1] - bg, data[4 * i + 2] - bb);
+    used = thr || Math.min(140, Math.max(18, otsu(d)));
+    for (let i = 0; i < n; i++) mask[i] = d[i] > used ? 1 : 0;
+  }
+  mask = morph(morph(mask, w, h, 0), w, h, 1);
+  mask = largestComponent(mask, w, h);
+  mask = fillMaskHoles(mask, w, h);
+  return { mask, thr: used };
+}
+function morph(m, w, h, dilate) {
+  const o = new Uint8Array(m.length);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = x + w * y, n = [x > 0 ? m[i - 1] : 0, x < w - 1 ? m[i + 1] : 0, y > 0 ? m[i - w] : 0, y < h - 1 ? m[i + w] : 0];
+    o[i] = dilate ? (m[i] || n.some(Boolean) ? 1 : 0) : (m[i] && n.every(Boolean) ? 1 : 0);
+  }
+  return o;
+}
+function largestComponent(m, w, h) {
+  const lab = new Int32Array(m.length), st = new Int32Array(m.length); let best = 0, bestL = 0, L = 0;
+  for (let s = 0; s < m.length; s++) {
+    if (!m[s] || lab[s]) continue; L++; let sp = 0, cnt = 0; st[sp++] = s; lab[s] = L;
+    while (sp) { const i = st[--sp]; cnt++; const x = i % w; for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) if (j >= 0 && j < m.length && m[j] && !lab[j]) { lab[j] = L; st[sp++] = j; } }
+    if (cnt > best) { best = cnt; bestL = L; }
+  }
+  const o = new Uint8Array(m.length); for (let i = 0; i < m.length; i++) o[i] = lab[i] === bestL && bestL ? 1 : 0; return o;
+}
+function fillMaskHoles(m, w, h) {
+  const out = new Uint8Array(m.length).fill(1), st = []; const push = i => { if (!m[i] && out[i]) { out[i] = 0; st.push(i); } };
+  for (let x = 0; x < w; x++) { push(x); push(x + w * (h - 1)); } for (let y = 0; y < h; y++) { push(w * y); push(w - 1 + w * y); }
+  while (st.length) { const i = st.pop(), x = i % w; if (x > 0) push(i - 1); if (x < w - 1) push(i + 1); if (i >= w) push(i - w); if (i < w * (h - 1)) push(i + w); }
+  return out;
+}
+function maskBox(m, w, h) {
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (m[x + w * y]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  return x1 < 0 ? null : { x0, y0, x1, y1 };
+}
+function distField(m, w, h) {
+  const d = new Float32Array(m.length), INF = 1e9;
+  for (let i = 0; i < m.length; i++) d[i] = m[i] ? INF : 0;
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? 0 : d[x + w * y];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = x + w * y; if (!d[i]) continue; d[i] = Math.min(d[i], at(x - 1, y) + 1, at(x, y - 1) + 1, at(x - 1, y - 1) + 1.414, at(x + 1, y - 1) + 1.414); }
+  for (let y = h - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--) { const i = x + w * y; if (!d[i]) continue; d[i] = Math.min(d[i], at(x + 1, y) + 1, at(x, y + 1) + 1, at(x + 1, y + 1) + 1.414, at(x - 1, y + 1) + 1.414); }
+  return d;
+}
+function sample(im, x, y) {
+  const xi = Math.max(0, Math.min(im.w - 1, x | 0)), yi = Math.max(0, Math.min(im.h - 1, y | 0)), o = 4 * (xi + im.w * yi);
+  return [im.data[o] / 255, im.data[o + 1] / 255, im.data[o + 2] / 255];
+}
+function drawMasked(canvas, im, mask) {
+  canvas.width = im.w; canvas.height = im.h; const x = canvas.getContext('2d'), id = x.createImageData(im.w, im.h);
+  for (let i = 0; i < im.w * im.h; i++) {
+    const k = 4 * i, on = !mask || mask[i];
+    id.data[k] = on ? im.data[k] : im.data[k] * 0.25 + 10; id.data[k + 1] = on ? im.data[k + 1] : im.data[k + 1] * 0.25 + 12;
+    id.data[k + 2] = on ? im.data[k + 2] : im.data[k + 2] * 0.25 + 16; id.data[k + 3] = 255;
+  }
+  x.putImageData(id, 0, 0);
+}
+
+/* ---------- Motor de uma foto: silhueta inflada, com relevo da IA quando houver mapa de profundidade ----------
+   o.depth (opcional): Float32Array do tamanho da foto, 0 = longe e 1 = perto. A frente do objeto ganha esse relevo;
+   o verso continua arredondado pela distância até a borda. o.step = índice da 1ª etapa na barra de progresso. */
+async function buildInflate(im, mask, o) {
+  const st = o.step ?? 0;
+  const bb = maskBox(mask, im.w, im.h); if (!bb) throw new Error('Não encontrei o objeto na foto. Tente outra foto ou outro motor.');
+  progress(st, 0); await frame();
+  const bw = bb.x1 - bb.x0 + 1, bh = bb.y1 - bb.y0 + 1, sc = o.res / Math.max(bw, bh);
+  const gx = Math.max(6, Math.round(bw * sc)), gy = Math.max(6, Math.round(bh * sc)), gm = new Uint8Array(gx * gy), gd = o.depth ? new Float32Array(gx * gy) : null;
+  for (let j = 0; j < gy; j++) for (let i = 0; i < gx; i++) {
+    const sx = Math.min(im.w - 1, bb.x0 + Math.floor((i + 0.5) / sc)), sy = Math.min(im.h - 1, bb.y0 + Math.floor((j + 0.5) / sc));
+    gm[i + gx * j] = mask[sx + im.w * sy];
+    if (gd) gd[i + gx * j] = o.depth[sx + im.w * sy];
+  }
+  const d = distField(gm, gx, gy); let dmax = 1; for (const v of d) if (v > dmax) dmax = v;
+  if (gd) { // normaliza a profundidade só dentro do objeto (percentis 3–97 para ignorar ruído)
+    const vals = []; for (let k = 0; k < gd.length; k++) if (gm[k]) vals.push(gd[k]);
+    vals.sort((a, b) => a - b);
+    const lo = vals[Math.floor(vals.length * 0.03)] ?? 0, hi = vals[Math.floor(vals.length * 0.97)] ?? 1, span = Math.max(1e-4, hi - lo);
+    for (let k = 0; k < gd.length; k++) gd[k] = Math.min(1, Math.max(0, (gd[k] - lo) / span));
+  }
+  const F = new Float32Array(gx * gy), B = new Float32Array(gx * gy), amp = Math.max(gx, gy) * 0.22 * (o.relief ?? 0);
+  let fmax = 1, bmax = 1;
+  for (let k = 0; k < F.length; k++) {
+    if (!gm[k]) continue;
+    const base = o.thick * Math.sqrt(d[k] * dmax) + 0.6;
+    if (gd) { const edge = Math.min(1, d[k] / (0.18 * dmax)); F[k] = base * 0.7 + amp * gd[k] * edge; B[k] = base * 0.8; }
+    else { F[k] = base; B[k] = base; }
+    if (F[k] > fmax) fmax = F[k]; if (B[k] > bmax) bmax = B[k];
+  }
+  progress(st + 1, 0); await frame(); checkCancel();
+  const nx = gx + 2, ny = gy + 2, zc = Math.ceil(bmax) + 2, nz = zc + Math.ceil(fmax) + 2, vox = new Uint8Array(nx * ny * nz);
+  for (let j = 0; j < gy; j++) for (let i = 0; i < gx; i++) {
+    const k = i + gx * j; if (!gm[k]) continue; const x = i + 1, y = gy - j;
+    for (let z = 0; z < nz; z++) { const dz = z + 0.5 - zc; if (dz <= F[k] && dz >= -B[k]) vox[x + nx * (y + ny * z)] = 1; }
+  }
+  const sm = blurVoxels(vox, nx, ny, nz);
+  progress(st + 2, 0); await frame(); checkCancel();
+  let rep = voxelsToMesh(sm, nx, ny, nz); rep = cleanTris(rep); taubin(rep, 8);
+  progress(st + 3, 0); await frame();
+  const col = new Float32Array(rep.pos.length);
+  for (let v = 0; v < rep.pos.length; v += 3) {
+    const i = rep.pos[v] - 1, j = gy - rep.pos[v + 1], back = rep.pos[v + 2] < zc;
+    const c = sample(im, bb.x0 + i / sc, bb.y0 + j / sc), k = back ? 0.86 : 1;
+    col[v] = c[0] * k; col[v + 1] = c[1] * k; col[v + 2] = c[2] * k;
+  }
+  rep.col = col;
+  for (let v = 0; v < rep.pos.length; v += 3) rep.pos[v + 2] -= zc;
+  rep = removeIslands(rep, 0.02).rep;
+  progress(st + 4, 0);
+  return fitHeight(rep, o.height);
+}
+
+/* ---------- Motor local 2: casco visual (várias fotos em volta) ---------- */
+async function buildHull(views, o) {
+  const steps = ['Recortando o fundo das fotos', 'Esculpindo pelo contorno', 'Gerando e suavizando malha', 'Projetando cores das fotos'];
+  progressOpen('Multi-imagem → 3D (local)', steps);
+  const V = [];
+  for (let i = 0; i < views.length; i++) {
+    checkCancel(); progress(0, i / views.length); await frame();
+    const v = views[i];
+    if (o.aiSeg) pnote(`IA recortando a foto ${i + 1} de ${views.length}`);
+    v.mask = o.aiSeg ? await aiSegment(v.im) : segment(v.im, o.thr).mask;
+    const seg = { mask: v.mask }, bb = maskBox(seg.mask, v.im.w, v.im.h);
+    if (!bb) continue;
+    const s = Math.max(1, (bb.y1 - bb.y0 + 1) / 2);
+    V.push({ im: v.im, mask: seg.mask, bb, s, cx: (bb.x0 + bb.x1 + 1) / 2, halfW: (bb.x1 - bb.x0 + 1) / 2 / s, th: o.dir * i * 2 * Math.PI / views.length });
+  }
+  renderScanThumbs();
+  if (V.length < 3) throw new Error('Preciso de pelo menos 3 fotos com o objeto bem recortado.');
+  const W = Math.max(...V.map(v => v.halfW)) * 1.04, cell = 2 / o.res, ny = o.res + 2, nx = Math.ceil(2 * W / cell) + 2, nz = nx;
+  const vox = new Uint8Array(nx * ny * nz), cs = V.map(v => Math.cos(v.th)), sn = V.map(v => Math.sin(v.th));
+  for (let z = 1; z < nz - 1; z++) {
+    if (z % 4 === 0) { checkCancel(); progress(1, z / nz); await frame(); }
+    const Z = -W + (z - 0.5) * cell;
+    for (let y = 1; y < ny - 1; y++) {
+      const Y = -1 + (y - 0.5) * cell;
+      for (let x = 1; x < nx - 1; x++) {
+        const X = -W + (x - 0.5) * cell; let inside = 1;
+        for (let k = 0; k < V.length; k++) {
+          const v = V[k], u = X * cs[k] - Z * sn[k], px = (v.cx + u * v.s) | 0, py = (v.bb.y1 + 1 - (Y + 1) * v.s) | 0;
+          if (px < 0 || py < 0 || px >= v.im.w || py >= v.im.h || !v.mask[px + v.im.w * py]) { inside = 0; break; }
+        }
+        vox[x + nx * (y + ny * z)] = inside;
+      }
+    }
+  }
+  progress(2, 0); await frame(); checkCancel();
+  let rep = cleanTris(voxelsToMesh(blurVoxels(vox, nx, ny, nz), nx, ny, nz));
+  if (!rep.idx.length) throw new Error('O volume ficou vazio. Confira o sentido do giro e se as fotos dão a volta completa.');
+  taubin(rep, 8); rep = removeIslands(rep, 0.02).rep;
+  progress(3, 0); await frame();
+  const nrm = vertexNormals(rep), col = new Float32Array(rep.pos.length);
+  for (let i = 0; i < rep.pos.length; i += 3) {
+    const X = -W + (rep.pos[i] - 1) * cell, Y = -1 + (rep.pos[i + 1] - 1) * cell, Z = -W + (rep.pos[i + 2] - 1) * cell;
+    let bk = 0, bd = -2;
+    for (let k = 0; k < V.length; k++) { const dd = nrm[i] * sn[k] + nrm[i + 2] * cs[k]; if (dd > bd) { bd = dd; bk = k; } }
+    const v = V[bk], c = sample(v.im, v.cx + (X * cs[bk] - Z * sn[bk]) * v.s, v.bb.y1 + 1 - (Y + 1) * v.s);
+    col[i] = c[0]; col[i + 1] = c[1]; col[i + 2] = c[2];
+  }
+  rep.col = col;
+  progress(4, 0);
+  return fitHeight(rep, o.height);
+}
+
+/* ---------- Motor local 3: relevo / litofania ---------- */
+function buildRelief(im, o) {
+  const gx = o.res, gy = Math.max(2, Math.round(o.res * im.h / im.w)), dx = o.width / (gx - 1), D = dx * (gy - 1);
+  const pos = [], col = [], idx = [], N = gx * gy;
+  for (let pass = 0; pass < 2; pass++) for (let j = 0; j < gy; j++) for (let i = 0; i < gx; i++) {
+    const c = sample(im, i / (gx - 1) * (im.w - 1), j / (gy - 1) * (im.h - 1)), L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    const t = o.kind === 'litho' ? 1 - L : L, edge = i === 0 || j === 0 || i === gx - 1 || j === gy - 1;
+    const y = pass ? 0 : o.base + (edge ? 0 : t * o.depth);
+    pos.push(i * dx - o.width / 2, y, j * dx - D / 2);
+    if (o.kind === 'litho') col.push(0.93, 0.92, 0.88); else col.push(c[0], c[1], c[2]);
+  }
+  const T = (i, j) => i + gx * j, B = (i, j) => N + i + gx * j;
+  for (let j = 0; j < gy - 1; j++) for (let i = 0; i < gx - 1; i++) {
+    idx.push(T(i, j), T(i, j + 1), T(i + 1, j + 1), T(i, j), T(i + 1, j + 1), T(i + 1, j));
+    idx.push(B(i, j), B(i + 1, j + 1), B(i, j + 1), B(i, j), B(i + 1, j), B(i + 1, j + 1));
+  }
+  const wall = (a, b) => idx.push(T(...a), T(...b), B(...b), T(...a), B(...b), B(...a));
+  for (let i = 0; i < gx - 1; i++) { wall([i, 0], [i + 1, 0]); wall([i, gy - 1], [i + 1, gy - 1]); }
+  for (let j = 0; j < gy - 1; j++) { wall([0, j], [0, j + 1]); wall([gx - 1, j], [gx - 1, j + 1]); }
+  const rep = { pos: new Float32Array(pos), col: new Float32Array(col), idx: Uint32Array.from(idx) };
+  return placeOnBed(orient(rep));
+}
+
+/* ---------- Exemplo inicial ---------- */
+function sampleVase() {
+  const prof = [[0, 0], [24, 0], [27, 6], [30, 24], [28, 42], [20, 58], [14, 66], [15, 74], [18, 80], [0, 80]].map(([x, y]) => new THREE.Vector2(x, y));
+  const g = new THREE.LatheGeometry(prof, 72).toNonIndexed(), p = g.attributes.position.array, c = new Float32Array(p.length);
+  for (let i = 0; i < p.length; i += 3) {
+    const t = p[i + 1] / 80, a = Math.atan2(p[i + 2], p[i]), band = 0.5 + 0.5 * Math.sin(a * 6 + t * 9);
+    c[i] = 0.86 - 0.18 * t + 0.06 * band; c[i + 1] = 0.52 + 0.12 * band - 0.1 * t; c[i + 2] = 0.3 + 0.2 * t;
+  }
+  return placeOnBed(orient(weld(p, c)));
+}
+
+/* ---------- Conversão de objetos importados ---------- */
+const texCache = new WeakMap();
+function texData(tex) {
+  if (texCache.has(tex)) return texCache.get(tex);
+  const img = tex.image, c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
+  const d = { w: c.width, h: c.height, data: x.getImageData(0, 0, c.width, c.height).data, flipY: tex.flipY };
+  texCache.set(tex, d); return d;
+}
+const lin2srgb = v => v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+function objectToRep(obj, zUp) {
+  obj.updateMatrixWorld(true); const P = [], C = [];
+  obj.traverse(m => {
+    if (!m.isMesh || !m.geometry?.attributes?.position) return;
+    let g = m.geometry.clone().applyMatrix4(m.matrixWorld); if (g.index) g = g.toNonIndexed();
+    const p = g.attributes.position.array, mat = Array.isArray(m.material) ? m.material[0] : m.material;
+    const ca = g.attributes.color, uv = g.attributes.uv, map = mat?.map;
+    let td = null; if (map?.image && uv) { try { td = texData(map); } catch { td = null; } }
+    const base = mat?.color ? [lin2srgb(mat.color.r), lin2srgb(mat.color.g), lin2srgb(mat.color.b)] : [0.84, 0.86, 0.89];
+    for (let i = 0; i < p.length / 3; i++) {
+      P.push(p[3 * i], p[3 * i + 1], p[3 * i + 2]);
+      if (td) {
+        let u = uv.getX(i) % 1, v = uv.getY(i) % 1; if (u < 0) u += 1; if (v < 0) v += 1;
+        const px = Math.min(td.w - 1, u * td.w | 0), py = Math.min(td.h - 1, (td.flipY ? 1 - v : v) * td.h | 0), o = 4 * (px + td.w * py);
+        C.push(td.data[o] / 255 * base[0], td.data[o + 1] / 255 * base[1], td.data[o + 2] / 255 * base[2]);
+      } else if (ca) C.push(lin2srgb(ca.getX(i)), lin2srgb(ca.getY(i)), lin2srgb(ca.getZ(i)));
+      else C.push(...base);
+    }
+  });
+  if (!P.length) throw new Error('O arquivo não tem nenhuma malha.');
+  const pos = new Float32Array(P);
+  if (zUp) for (let i = 0; i < pos.length; i += 3) { const y = pos[i + 1]; pos[i + 1] = pos[i + 2]; pos[i + 2] = -y; }
+  return placeOnBed(weld(pos, new Float32Array(C)));
+}
+async function importFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase(), url = URL.createObjectURL(file);
+  try {
+    let obj, zUp = true;
+    if (ext === 'stl') obj = new THREE.Mesh(new STLLoader().parse(await file.arrayBuffer()));
+    else if (ext === 'obj') obj = new OBJLoader().parse(await file.text());
+    else if (ext === '3mf') obj = new ThreeMFLoader().parse(await file.arrayBuffer());
+    else if (ext === 'glb' || ext === 'gltf') { obj = (await new GLTFLoader().loadAsync(url)).scene; zUp = false; }
+    else throw new Error('Formato não suportado: .' + ext);
+    if (ext === '3mf') { obj.rotation.set(0, 0, 0); obj.updateMatrixWorld(true); }
+    let rep = objectToRep(obj, zUp);
+    const sz = analyze(rep).size;
+    if (Math.max(...sz) < 5) { rep = fitHeight(rep, 80); toast('O modelo estava em metros; ajustei para 80 mm de altura.'); }
+    setModel(rep, file.name.replace(/\.[^.]+$/, ''));
+  } finally { URL.revokeObjectURL(url); }
+}
+
+/* ---------- Exibição ---------- */
+const srgb2lin = v => v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+function refresh(refit = false) {
+  const rep = S.rep; if (!rep) return;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(rep.pos, 3)); g.setIndex(new THREE.BufferAttribute(rep.idx, 1)); g.computeVertexNormals();
+  let colors = null;
+  if (S.over) {
+    const n = g.attributes.normal.array, b = bbox(rep); colors = new Float32Array(rep.pos.length);
+    for (let i = 0; i < n.length; i += 3) {
+      const bad = n[i + 1] < -0.7071 && rep.pos[i + 1] > b.min[1] + 0.4;
+      colors.set(bad ? [1, 0.12, 0.08] : [0.62, 0.66, 0.72], i);
+    }
+  } else if (S.colors && rep.col) { colors = new Float32Array(rep.col.length); for (let i = 0; i < colors.length; i++) colors[i] = srgb2lin(rep.col[i]); }
+  if (colors) g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  meshObj.geometry.dispose(); meshObj.geometry = g;
+  material.vertexColors = !!colors; material.color.set(colors ? 0xffffff : 0xd6dbe2); material.wireframe = S.wire; material.needsUpdate = true;
+  updateStats();
+  if (refit) fitView();
+  $('#tUndo').disabled = !S.undo.length;
+}
+function updateStats() {
+  const a = analyze(S.rep); S.stats = a;
+  const [x, y, z] = [a.size[0], a.size[2], a.size[1]];
+  $('#dimX').value = x.toFixed(1); $('#dimY').value = y.toFixed(1); $('#dimZ').value = z.toFixed(1);
+  $('#infoName').textContent = S.name || 'Sem título';
+  $('#infoDims').textContent = `${nf(x)} × ${nf(y)} × ${nf(z)} mm`;
+  $('#infoTris').textContent = `${a.nT.toLocaleString('pt-BR')} triângulos`;
+  $('#stTris').textContent = a.nT.toLocaleString('pt-BR');
+  $('#stOpen').textContent = a.open.toLocaleString('pt-BR');
+  $('#stNonMan').textContent = a.nonman.toLocaleString('pt-BR');
+  $('#stParts').textContent = a.parts;
+  $('#stVol').textContent = nf(a.vol / 1000) + ' cm³';
+  $('#stArea').textContent = nf(a.area / 100) + ' cm²';
+  $('#stOver').textContent = nf(a.over / Math.max(1, a.area) * 100) + ' %';
+  const water = a.open === 0 && a.nonman === 0;
+  $('#waterPill').innerHTML = water ? (a.parts > 1 ? `<span class="pill warn">Fechada, mas com ${a.parts} partes</span>` : '<span class="pill ok">Malha fechada e pronta</span>')
+    : `<span class="pill bad">${a.open ? a.open + ' bordas abertas' : a.nonman + ' arestas problemáticas'}: use Reparar</span>`;
+  $('#cutH').max = Math.max(1, Math.floor(z * 0.5));
+  updateEstimate();
+}
+function updateEstimate() {
+  if (!S.stats) return;
+  const a = S.stats, [bx, by, bz] = printerDims(), dims = [a.size[0], a.size[2], a.size[1]];
+  const fits = dims[0] <= bx && dims[1] <= by && dims[2] <= bz;
+  bedBox.material.color.set(fits ? 0x3a414c : 0xff6b5e);
+  $('#fitPill').innerHTML = fits ? `<span class="pill ok">Cabe na mesa (${bx}×${by}×${bz} mm)</span>` : `<span class="pill bad">Maior que a área de impressão (${bx}×${by}×${bz} mm)</span>`;
+  const layer = +$('#selLayer').value, infill = Math.min(100, Math.max(0, +$('#inInfill').value)) / 100, walls = Math.max(1, +$('#inWalls').value);
+  const shell = Math.min(a.vol, a.area * walls * 0.42), used = shell + (a.vol - shell) * infill;
+  const grams = used / 1000 * +$('#selMat').value, meters = used / (Math.PI * 0.875 ** 2) / 1000;
+  const flow = 11 * (layer / 0.2), secs = used / flow * 1.4 + (dims[2] / layer) * 4, hh = Math.floor(secs / 3600), mm = Math.round(secs / 60 % 60);
+  $('#esGrams').textContent = nf(grams, 0) + ' g'; $('#esMeters').textContent = nf(meters, 1) + ' m'; $('#esTime').textContent = hh ? `${hh}h${String(mm).padStart(2, '0')}` : `${mm} min`;
+}
+function thumb() {
+  renderer.render(scene, camera);
+  const c = document.createElement('canvas'), src = renderer.domElement, s = 200 / src.width; c.width = 200; c.height = Math.round(src.height * s);
+  const x = c.getContext('2d'); x.fillStyle = '#12151a'; x.fillRect(0, 0, c.width, c.height); x.drawImage(src, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.75);
+}
+function setModel(rep, name) {
+  S.rep = placeOnBed(rep); S.name = name; S.undo = []; $('#projName').value = name;
+  refresh(true);
+  setTimeout(() => {
+    S.history.unshift({ name, rep: cloneRep(S.rep), img: thumb() }); S.cur = 0;
+    if (S.history.length > 18) S.history.pop(); renderGallery();
+  });
+}
+function renderGallery() {
+  $('#galEmpty').hidden = S.history.length > 0;
+  $('#gallery').innerHTML = S.history.map((h, i) => `<button type="button" data-i="${i}" class="${i === S.cur ? 'cur' : ''}" title="${h.name}"><img src="${h.img}" alt=""><small>${h.name}</small></button>`).join('');
+}
+$('#gallery').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return; const h = S.history[+b.dataset.i];
+  S.cur = +b.dataset.i; S.rep = cloneRep(h.rep); S.name = h.name; S.undo = []; $('#projName').value = h.name; refresh(true); renderGallery();
+};
+function edit(fn) {
+  if (!S.rep) return toast('Gere ou importe um modelo primeiro.');
+  S.undo.push(cloneRep(S.rep)); if (S.undo.length > 12) S.undo.shift();
+  try { const msg = fn(); placeOnBed(S.rep); refresh(); if (msg) toast(msg, 'ok'); }
+  catch (e) { S.rep = S.undo.pop(); refresh(); toast(e.message, 'bad'); }
+}
+
+/* ---------- Exportação ---------- */
+const NATIVE = !!window.Capacitor?.isNativePlatform?.();
+const blobToBase64 = b => new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = fail; r.readAsDataURL(b); });
+async function download(blob, name) {
+  if (NATIVE) { // no app nativo: grava no cache e abre a folha de compartilhamento (Arquivos, Drive, Bambu Handy…)
+    const { Filesystem, Share } = window.Capacitor.Plugins;
+    const { uri } = await Filesystem.writeFile({ path: name, data: await blobToBase64(blob), directory: 'CACHE' });
+    await Share.share({ title: name, files: [uri] }).catch(e => { if (!/cancel/i.test(e?.message || '')) throw e; });
+    return;
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const toPrint = (p, i) => [p[i], -p[i + 2], p[i + 1]]; // Y-up (visualizador) → Z-up (fatiadores)
+function exportSTL(rep) {
+  const { pos, idx } = rep, n = idx.length / 3, buf = new ArrayBuffer(84 + 50 * n), dv = new DataView(buf);
+  const head = 'binary STL - 3D Maker AI (mm)'; for (let i = 0; i < head.length; i++) dv.setUint8(i, head.charCodeAt(i));
+  dv.setUint32(80, n, true);
+  for (let t = 0; t < n; t++) {
+    const a = toPrint(pos, idx[3 * t] * 3), b = toPrint(pos, idx[3 * t + 1] * 3), c = toPrint(pos, idx[3 * t + 2] * 3);
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const nn = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], l = Math.hypot(...nn) || 1;
+    let o = 84 + 50 * t;
+    for (const val of [...nn.map(x => x / l), ...a, ...b, ...c]) { dv.setFloat32(o, val, true); o += 4; }
+  }
+  return new Blob([buf], { type: 'model/stl' });
+}
+function exportOBJ(rep) {
+  const L = ['# 3D Maker AI — unidades em mm, Z para cima'], { pos, col, idx } = rep;
+  for (let i = 0; i < pos.length; i += 3) { const p = toPrint(pos, i); L.push(`v ${p[0].toFixed(4)} ${p[1].toFixed(4)} ${p[2].toFixed(4)}` + (col ? ` ${col[i].toFixed(3)} ${col[i + 1].toFixed(3)} ${col[i + 2].toFixed(3)}` : '')); }
+  for (let t = 0; t < idx.length; t += 3) L.push(`f ${idx[t] + 1} ${idx[t + 1] + 1} ${idx[t + 2] + 1}`);
+  return new Blob([L.join('\n')], { type: 'text/plain' });
+}
+function export3MF(rep, title) {
+  const { pos, idx } = rep, v = [], t = [];
+  for (let i = 0; i < pos.length; i += 3) { const p = toPrint(pos, i); v.push(`<vertex x="${p[0].toFixed(4)}" y="${p[1].toFixed(4)}" z="${p[2].toFixed(4)}"/>`); }
+  for (let i = 0; i < idx.length; i += 3) t.push(`<triangle v1="${idx[i]}" v2="${idx[i + 1]}" v3="${idx[i + 2]}"/>`);
+  const esc = s => s.replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+  const model = `<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="pt-BR" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><metadata name="Title">${esc(title)}</metadata><metadata name="Application">3D Maker AI</metadata><resources><object id="1" type="model"><mesh><vertices>${v.join('')}</vertices><triangles>${t.join('')}</triangles></mesh></object></resources><build><item objectid="1"/></build></model>`;
+  const files = {
+    '[Content_Types].xml': strToU8('<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>'),
+    '_rels/.rels': strToU8('<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>'),
+    '3D/3dmodel.model': strToU8(model),
+  };
+  return new Blob([zipSync(files, { level: 6 })], { type: 'model/3mf' });
+}
+async function exportGLB(rep) {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(rep.pos.map(v => v / 1000), 3)); g.setIndex(new THREE.BufferAttribute(rep.idx, 1)); g.computeVertexNormals();
+  if (rep.col) g.setAttribute('color', new THREE.BufferAttribute(rep.col.map(srgb2lin), 3));
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: !!rep.col, roughness: 0.6 }));
+  const out = await new GLTFExporter().parseAsync(m, { binary: true });
+  return new Blob([out], { type: 'model/gltf-binary' });
+}
+async function doExport(kind) {
+  if (!S.rep) return toast('Nada para exportar ainda.');
+  const base = ($('#projName').value.trim() || 'modelo').replace(/[\\/:*?"<>|]+/g, '-');
+  if (S.stats && (S.stats.open || S.stats.nonman) && kind !== 'glb') toast('Atenção: a malha tem defeitos. Recomendo “Reparar malha” antes de imprimir.', 'bad');
+  const blob = kind === 'stl' ? exportSTL(S.rep) : kind === 'obj' ? exportOBJ(S.rep) : kind === '3mf' ? export3MF(S.rep, base) : await exportGLB(S.rep);
+  try { await download(blob, `${base}.${kind}`); }
+  catch (e) { return toast('Não consegui salvar o arquivo: ' + (e.message || e), 'bad'); }
+  if (!(S.stats && (S.stats.open || S.stats.nonman))) toast(`${base}.${kind} exportado (${nf(blob.size / 1048576, 1)} MB)`, 'ok');
+}
+
+/* ---------- IA própria com modelos abertos ----------
+   No aparelho (transformers.js): ORMBG recorta o fundo e Depth Anything V2 estima a profundidade.
+   Na nuvem (Hugging Face Spaces, GPU gratuita): Hunyuan3D-2 e TRELLIS geram o 3D; FLUX.1-schnell desenha a partir de texto. */
+const AI_LIBS = {
+  transformers: 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1',
+};
+const AI = {};
+
+// --- No aparelho ---
+const aiProgress = label => p => {
+  if (p.status === 'progress' && p.total) pnote(`${label}: ${Math.round(p.loaded / 1048576)} de ${Math.round(p.total / 1048576)} MB`);
+  if (p.status === 'ready') pnote('');
+};
+async function aiPipeline(key, task, model) {
+  if (AI[key]) return AI[key];
+  try {
+    AI.tf ??= await import(AI_LIBS.transformers);
+    AI[key] = await AI.tf.pipeline(task, model, { dtype: 'q8', progress_callback: aiProgress('Baixando IA (só na 1ª vez)') });
+  } catch (e) {
+    throw new Error('Não consegui carregar a IA do aparelho. Na 1ª vez é preciso internet para baixar os modelos (~70 MB).');
+  }
+  return AI[key];
+}
+const toRaw = im => AI.tf.RawImage.fromCanvas(im.canvas);
+function resampleChannel(img, ch, w, h) { // canal de uma RawImage redimensionado para w×h, valores 0..1
+  const out = new Float32Array(w * h), C = img.channels;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const sx = Math.min(img.width - 1, Math.floor((x + 0.5) * img.width / w)), sy = Math.min(img.height - 1, Math.floor((y + 0.5) * img.height / h));
+    out[x + w * y] = img.data[(sx + img.width * sy) * C + Math.min(ch, C - 1)] / 255;
+  }
+  return out;
+}
+async function aiSegment(im) {
+  const seg = await aiPipeline('seg', 'background-removal', 'onnx-community/ormbg-ONNX');
+  await frame(); checkCancel();
+  const out = await seg(toRaw(im)), o = Array.isArray(out) ? out[0] : out;
+  const a = resampleChannel(o, o.channels === 4 ? 3 : 0, im.w, im.h);
+  let mask = new Uint8Array(im.w * im.h); for (let i = 0; i < mask.length; i++) mask[i] = a[i] > 0.5 ? 1 : 0;
+  mask = fillMaskHoles(largestComponent(mask, im.w, im.h), im.w, im.h);
+  if (!maskBox(mask, im.w, im.h)) throw new Error('A IA não encontrou nenhum objeto na foto.');
+  return mask;
+}
+async function aiDepth(im) {
+  const dep = await aiPipeline('depth', 'depth-estimation', 'onnx-community/depth-anything-v2-small');
+  await frame(); checkCancel();
+  const { depth } = await dep(toRaw(im));
+  return resampleChannel(depth, 0, im.w, im.h);
+}
+async function deviceImageTo3D(im, o, title) {
+  progressOpen(title, ['Recortando o fundo com IA', 'Estimando a profundidade com IA', 'Esculpindo o volume', 'Gerando a malha', 'Suavizando', 'Aplicando as cores']);
+  await frame();
+  const mask = await aiSegment(im);
+  progress(1, 0); pnote('');
+  const depth = await aiDepth(im);
+  return { rep: await buildInflate(im, mask, { ...o, depth, step: 2 }), mask };
+}
+
+// --- Conta, créditos e geração na nuvem (Supabase) ---
+// A IA na nuvem só roda pelo servidor: ele confere o login, cobra 1 crédito (administrador não paga) e devolve se falhar.
+const SUPA = {
+  url: 'https://nrlveaxvnemedrstduzl.supabase.co',
+  key: 'sb_publishable_6aK3h_V50JkshwQ_kLRFug_qiwYyV2k',
+  lib: 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm',
+};
+const ACC = { sb: null, user: null, profile: null, recovering: false };
+class QuotaError extends Error {}
+async function sb() {
+  if (ACC.sb) return ACC.sb;
+  const { createClient } = await import(SUPA.lib);
+  ACC.sb = createClient(SUPA.url, SUPA.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+  ACC.sb.auth.onAuthStateChange((event, session) => {
+    ACC.user = session?.user || null;
+    if (event === 'PASSWORD_RECOVERY') { ACC.recovering = true; openAccount('Digite a nova senha.'); }
+    setTimeout(refreshProfile, 0);
+  });
+  return ACC.sb;
+}
+async function refreshProfile() {
+  if (!ACC.user) { ACC.profile = null; return renderAccount(); }
+  const { data } = await (await sb()).from('profiles').select('email, credits, is_admin').eq('id', ACC.user.id).maybeSingle();
+  ACC.profile = data || null; renderAccount();
+}
+function updateApiChip() { renderAccount(); }
+function renderAccount() {
+  const p = ACC.profile, chip = $('#apiChip'), av = $('#btnAccount'), admin = !!p?.is_admin;
+  if (!ACC.user) {
+    chip.className = 'api-chip'; chip.textContent = 'Entrar';
+    $('#railCreditsN').textContent = '—'; av.textContent = '?'; av.classList.remove('in'); av.title = 'Entrar';
+  } else {
+    chip.className = 'api-chip on'; chip.textContent = admin ? 'Admin · uso livre' : `${p?.credits ?? '…'} créditos`;
+    $('#railCreditsN').textContent = admin ? '∞' : String(p?.credits ?? '…');
+    av.textContent = (ACC.user.email || '?')[0].toUpperCase(); av.classList.add('in'); av.title = ACC.user.email;
+  }
+  if ($('#dlgAccount').open) renderAccountDialog();
+}
+const REASONS = { bonus_cadastro: 'Bônus de cadastro', geracao_image: 'Imagem → 3D', geracao_text: 'Texto → 3D', geracao_multi: 'Multi-imagem → 3D', estorno_falha: 'Estorno de falha', ajuste_admin: 'Ajuste do administrador' };
+async function renderAccountDialog() {
+  const inside = !!ACC.user && !ACC.recovering;
+  $('#accOut').hidden = inside || ACC.recovering; $('#accReset').hidden = !ACC.recovering; $('#accIn').hidden = !inside;
+  $('#accTitle').textContent = inside ? 'Sua conta' : ACC.recovering ? 'Nova senha' : 'Entrar no 3D Maker AI';
+  if (!inside) { $('#accGo').textContent = accMode() === 'up' ? 'Criar conta' : 'Entrar'; return; }
+  const p = ACC.profile || {};
+  $('#accEmailV').textContent = ACC.user.email;
+  $('#accCreditsV').textContent = p.is_admin ? 'Ilimitado' : String(p.credits ?? '…');
+  $('#accPlanV').textContent = p.is_admin ? 'Administrador' : 'Créditos';
+  const { data: led } = await (await sb()).from('credit_ledger').select('delta, reason, created_at').order('created_at', { ascending: false }).limit(10);
+  $('#accLedger').innerHTML = (led || []).map(l => `<div><span>${REASONS[l.reason] || l.reason}</span><b class="${l.delta > 0 ? 'pos' : 'neg'}">${l.delta > 0 ? '+' : ''}${l.delta}</b><small>${new Date(l.created_at).toLocaleDateString('pt-BR')}</small></div>`).join('') || '<p class="hint">Nenhuma movimentação ainda.</p>';
+  $('#accAdmin').hidden = !p.is_admin;
+  if (p.is_admin) loadAdminList();
+}
+const accMode = () => document.querySelector('input[name=accMode]:checked').value;
+function openAccount(msg = '') { $('#accMsg').textContent = msg; $('#dlgAccount').open || $('#dlgAccount').showModal(); renderAccountDialog(); }
+async function requireLogin() {
+  await sb();
+  if (ACC.user) return true;
+  openAccount('Entre ou crie sua conta para usar a IA na nuvem. A IA do aparelho continua grátis e sem limite.');
+  return false;
+}
+function ensureConsent() {
+  try { if (localStorage.getItem('cloudConsent') === '1') return Promise.resolve(true); } catch {}
+  return new Promise(ok => {
+    const d = $('#dlgConsent'); d.showModal();
+    $('#consentYes').onclick = () => { try { localStorage.setItem('cloudConsent', '1'); } catch {} d.close(); ok(true); };
+    $('#consentNo').onclick = () => { d.close(); ok(false); };
+  });
+}
+async function toDataURL(file, max = 1024) {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }), s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.9);
+}
+async function serverGenerate(payload) {
+  const client = await sb();
+  pnote('Processando na GPU… (15 a 60 s)');
+  const { data, error } = await client.functions.invoke('generate', { body: payload });
+  checkCancel();
+  if (error) {
+    let info = {}; try { info = await error.context.json(); } catch {}
+    if (info.credits_left != null && ACC.profile) { ACC.profile.credits = info.credits_left; renderAccount(); }
+    if (info.error === 'sem_creditos') throw new Error('Seus créditos acabaram. A IA do aparelho continua grátis e sem limite.');
+    if (info.error === 'cota_gpu') throw new QuotaError(info.message);
+    throw new Error(info.message || 'Não consegui falar com o servidor de IA. Verifique a internet.');
+  }
+  if (ACC.profile && data.credits_left != null) { ACC.profile.credits = data.credits_left; renderAccount(); }
+  pnote('');
+  return data;
+}
+async function loadRemoteGLB(url) {
+  if (!url) throw new Error('O servidor de IA não devolveu o modelo.');
+  try { return objectToRep((await new GLTFLoader().loadAsync(url)).scene, false); }
+  catch { throw new Error('Não consegui baixar o modelo gerado. Verifique a internet.'); }
+}
+// Pinta a malha projetando a foto de frente. Compara a silhueta com a máscara da foto para descobrir se o modelo olha para +Z ou −Z.
+function projectColors(rep, im, mask) {
+  const bb = (mask && maskBox(mask, im.w, im.h)) || { x0: 0, y0: 0, x1: im.w - 1, y1: im.h - 1 };
+  const bw = bb.x1 - bb.x0 + 1, bh = bb.y1 - bb.y0 + 1, b = bbox(rep), p = rep.pos;
+  const sx = Math.max(1e-6, b.max[0] - b.min[0]), sy = Math.max(1e-6, b.max[1] - b.min[1]), G = 48, occ = new Uint8Array(G * G);
+  for (let i = 0; i < p.length; i += 3) occ[Math.min(G - 1, ((p[i] - b.min[0]) / sx * G) | 0) + G * Math.min(G - 1, ((b.max[1] - p[i + 1]) / sy * G) | 0)] = 1;
+  const iou = mirror => {
+    if (!mask) return 0; let inter = 0, uni = 0;
+    for (let gy = 0; gy < G; gy++) for (let gx = 0; gx < G; gx++) {
+      const m = mask[Math.min(im.w - 1, bb.x0 + (((mirror ? G - 1 - gx : gx) + 0.5) / G * bw) | 0) + im.w * Math.min(im.h - 1, bb.y0 + ((gy + 0.5) / G * bh) | 0)], o = occ[gx + G * gy];
+      inter += m && o ? 1 : 0; uni += m || o ? 1 : 0;
+    }
+    return inter / Math.max(1, uni);
+  };
+  const mirror = iou(true) > iou(false) + 0.01, n = vertexNormals(rep), col = new Float32Array(p.length);
+  for (let i = 0; i < p.length; i += 3) {
+    let u = (p[i] - b.min[0]) / sx; if (mirror) u = 1 - u;
+    const c = sample(im, bb.x0 + u * bw, bb.y0 + (b.max[1] - p[i + 1]) / sy * bh), k = (mirror ? -n[i + 2] : n[i + 2]) > -0.2 ? 1 : 0.84;
+    col[i] = c[0] * k; col[i + 1] = c[1] * k; col[i + 2] = c[2] * k;
+  }
+  rep.col = col;
+  return rep;
+}
+// Pedidos ao servidor: foto, várias fotos ou texto → modelo 3D (Hunyuan3D-2 / TRELLIS / FLUX rodam lá)
+async function cloudShape(file) {
+  const d = await serverGenerate({ kind: 'image', image: await toDataURL(file) });
+  return { rep: await loadRemoteGLB(d.glb_url), textured: d.textured, model: d.model };
+}
+async function cloudMulti(files) {
+  const images = []; for (const f of files) images.push(await toDataURL(f, 768));
+  const d = await serverGenerate({ kind: 'multi', images });
+  return { rep: await loadRemoteGLB(d.glb_url), textured: d.textured, model: d.model };
+}
+async function cloudText(prompt, style) {
+  const d = await serverGenerate({ kind: 'text', prompt, style });
+  return { rep: await loadRemoteGLB(d.glb_url), textured: d.textured, model: d.model, image_url: d.image_url };
+}
+// Finaliza um modelo vindo da nuvem: cores, reparo e tamanho.
+function finishCloud(res, im, mask, height) {
+  let rep = res.rep;
+  if (!res.textured && im) projectColors(rep, im, mask);
+  rep = repairAll(rep).rep;
+  return fitHeight(rep, height);
+}
+async function runJob(title, steps, fn) {
+  progressOpen(title, steps);
+  try { await fn(); }
+  catch (e) {
+    progressClose();
+    if (e.message !== 'cancelado') toast(e.message, 'bad'); else toast('Geração cancelada.');
+  }
+}
+
+/* ---------- Modos ---------- */
+function setMode(m) {
+  $$('.rail button').forEach(b => b.setAttribute('aria-selected', b.dataset.mode === m));
+  $$('.panel.left .sec[data-mode]').forEach(s => s.hidden = s.dataset.mode !== m);
+  try { localStorage.setItem('mode', m); } catch {}
+}
+$$('.rail button').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+function dropZone(el, cb) {
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('over'));
+  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('over'); if (e.dataTransfer.files.length) cb([...e.dataTransfer.files]); });
+}
+async function runLocal(fn, name) {
+  try { const rep = await fn(); progressClose(); setModel(rep, name); toast('Modelo pronto. Revise a malha e exporte.', 'ok'); }
+  catch (e) { progressClose(); toast(e.message === 'cancelado' ? 'Geração cancelada.' : e.message, e.message === 'cancelado' ? '' : 'bad'); }
+}
+
+// Imagem → 3D
+const IMG = { im: null, mask: null };
+const imgEngine = () => document.querySelector('input[name=imgEngine]:checked').value;
+async function setImgFile(f) {
+  if (!f?.type.startsWith('image/')) return toast('Escolha um arquivo de imagem.', 'bad');
+  IMG.im = await loadIm(f); IMG.file = f; resegImg();
+  $('#imgCanvas').hidden = false; $('#imgEmpty').hidden = true; $('#btnImgGen').disabled = false;
+}
+function resegImg() {
+  if (!IMG.im) return;
+  const r = segment(IMG.im, $('#imgAuto').checked ? 0 : +$('#imgThr').value); IMG.mask = r.mask;
+  if (r.thr > 0 && $('#imgAuto').checked) { $('#imgThr').value = Math.round(r.thr); $('#imgThrOut').textContent = Math.round(r.thr); }
+  drawMasked($('#imgCanvas'), IMG.im, imgEngine() === 'local' ? IMG.mask : null);
+}
+$('#imgCam').onchange = e => e.target.files[0] && setImgFile(e.target.files[0]);
+$('#imgFile').onchange = e => e.target.files[0] && setImgFile(e.target.files[0]);
+dropZone($('#imgDrop'), f => setImgFile(f[0]));
+$('#imgAuto').onchange = () => { $('#imgThrWrap').hidden = $('#imgAuto').checked || imgEngine() !== 'local'; resegImg(); };
+$('#imgThr').oninput = () => { $('#imgThrOut').textContent = $('#imgThr').value; resegImg(); };
+$('#imgThick').oninput = () => $('#imgThickOut').textContent = nf(+$('#imgThick').value, 2);
+$('#imgRelief').oninput = () => $('#imgReliefOut').textContent = nf(+$('#imgRelief').value, 2);
+function showImgEngine() {
+  const e = imgEngine();
+  $$('[data-mode="image"] [data-eng]').forEach(el => el.hidden = !el.dataset.eng.split(' ').includes(e));
+  $('#imgThrWrap').hidden = e !== 'local' || $('#imgAuto').checked;
+  resegImg();
+}
+$$('input[name=imgEngine]').forEach(r => r.onchange = showImgEngine);
+const imgOpts = () => ({ res: +$('#imgRes').value, thick: +$('#imgThick').value, relief: +$('#imgRelief').value, height: +$('#imgHeight').value || 80 });
+// Foto → 3D com a IA do aparelho; usado também como plano B quando a cota da nuvem acaba
+async function imageOnDevice(im, name, title) {
+  const { rep, mask } = await deviceImageTo3D(im, imgOpts(), title);
+  progressClose(); setModel(rep, name);
+  return mask;
+}
+$('#btnImgGen').onclick = async () => {
+  if (!IMG.im) return;
+  const name = IMG.file.name.replace(/\.[^.]+$/, '') || 'Foto', e = imgEngine();
+  if (e === 'local') {
+    progressOpen('Imagem → 3D (rápido)', ['Recortando o fundo', 'Esculpindo o volume', 'Gerando a malha', 'Suavizando', 'Aplicando as cores']);
+    return runLocal(() => buildInflate(IMG.im, IMG.mask, { ...imgOpts(), step: 1 }), name);
+  }
+  if (e === 'device') return runJob('Imagem → 3D (IA no aparelho)', [], async () => {
+    const mask = await imageOnDevice(IMG.im, name + ' (IA)', 'Imagem → 3D (IA no aparelho)');
+    drawMasked($('#imgCanvas'), IMG.im, mask); toast('Modelo gerado pela IA do aparelho.', 'ok');
+  });
+  if (!(await requireLogin()) || !(await ensureConsent())) return;
+  runJob('Imagem → 3D (IA na nuvem)', ['Enviando a foto', 'Reconstruindo em 3D na GPU', 'Pintando e preparando'], async () => {
+    let res;
+    progress(1, 0);
+    try { res = await cloudShape(IMG.file); }
+    catch (err) {
+      if (!(err instanceof QuotaError)) throw err;
+      toast(err.message + ' Gerando com a IA do aparelho.', 'bad');
+      const mask = await imageOnDevice(IMG.im, name + ' (IA)', 'Imagem → 3D (IA no aparelho)');
+      return drawMasked($('#imgCanvas'), IMG.im, mask);
+    }
+    progress(2, 0); await frame();
+    const rep = finishCloud(res, IMG.im, segment(IMG.im, 0).mask, +$('#imgHeight').value || 80);
+    progressClose(); setModel(rep, `${name} (${res.model})`); toast(`Modelo gerado por ${res.model}.`, 'ok');
+  });
+};
+
+// Texto → 3D
+$('#txtChips').onclick = e => { if (e.target.matches('.chip')) $('#txtPrompt').value = e.target.textContent; };
+$('#btnTxtGen').onclick = async () => {
+  const prompt = $('#txtPrompt').value.trim(); if (!prompt) return toast('Descreva o objeto primeiro.');
+  const height = +$('#txtHeight').value || 80, name = prompt.slice(0, 40);
+  if (!(await requireLogin()) || !(await ensureConsent())) return;
+  runJob('Texto → 3D', ['Desenhando o objeto e criando o 3D na GPU', 'Pintando e preparando'], async () => {
+    const res = await cloudText(prompt, $('#txtStyle').value);
+    progress(1, 0); await frame();
+    let im = null;
+    if (res.image_url) { im = await loadIm(await (await fetch(res.image_url)).blob(), 420); drawMasked($('#txtCanvas'), im, null); $('#txtPreview').hidden = false; }
+    const rep = finishCloud(res, im, im && segment(im, 0).mask, height);
+    progressClose(); setModel(rep, name); toast(`Modelo gerado: FLUX + ${res.model}.`, 'ok');
+  });
+};
+
+// Multi-imagem
+const SCAN = [];
+const scanEngine = () => document.querySelector('input[name=scanEngine]:checked').value;
+async function addScan(files) {
+  for (const f of files) if (f.type.startsWith('image/')) SCAN.push({ im: await loadIm(f, 360), file: f, mask: null });
+  renderScanThumbs();
+}
+function renderScanThumbs() {
+  const n = SCAN.length;
+  $('#scanCount').textContent = n + (n === 1 ? ' foto' : ' fotos');
+  $('#scanStep').textContent = n < 3 ? 'Adicione fotos em ordem, dando a volta completa.' : `${nf(360 / n, 0)}° entre fotos${n < 12 ? ' · recomendo 12 ou mais' : ''}`;
+  $('#btnScanGen').disabled = n < (scanEngine() === 'cloud' ? 1 : 3);
+  let s = '<circle cx="42" cy="42" r="30" fill="none" stroke="#343b46" stroke-width="2"/><path d="M42 30 52 36v12l-10 6-10-6V36z" fill="none" stroke="#5d6672" stroke-width="1.5"/>';
+  for (let i = 0; i < n; i++) { const a = i / n * 2 * Math.PI - Math.PI / 2; s += `<circle cx="${42 + 30 * Math.cos(a)}" cy="${42 + 30 * Math.sin(a)}" r="3.2" fill="#c5f955"/>`; }
+  $('#scanRing').innerHTML = s;
+  const box = $('#scanThumbs'); box.innerHTML = '';
+  SCAN.forEach((v, i) => {
+    const d = document.createElement('div'); d.className = 't'; const c = document.createElement('canvas'); drawMasked(c, v.im, v.mask);
+    d.append(c); d.insertAdjacentHTML('beforeend', `<span>${nf(i * 360 / n, 0)}°</span><button type="button" aria-label="Remover foto ${i + 1}" data-i="${i}">×</button>`);
+    box.append(d);
+  });
+}
+$('#scanThumbs').onclick = e => { const b = e.target.closest('button'); if (b) { SCAN.splice(+b.dataset.i, 1); renderScanThumbs(); } };
+$('#scanCam').onchange = e => { addScan([...e.target.files]); e.target.value = ''; };
+$('#scanFiles').onchange = e => { addScan([...e.target.files]); e.target.value = ''; };
+$('#scanClear').onclick = () => { SCAN.length = 0; renderScanThumbs(); };
+$('#scanThr').oninput = () => $('#scanThrOut').textContent = +$('#scanThr').value ? $('#scanThr').value : 'auto';
+$$('input[name=scanEngine]').forEach(r => r.onchange = () => {
+  const cloud = scanEngine() === 'cloud'; $('#scanLocalOpts').hidden = cloud; $('#scanCloudNote').hidden = !cloud; renderScanThumbs();
+});
+$('#btnScanGen').onclick = async () => {
+  const height = +$('#scanHeight').value || 80;
+  if (scanEngine() === 'local') return runLocal(() => buildHull(SCAN, { thr: +$('#scanThr').value, dir: +$('#scanDir').value, res: +$('#scanRes').value, height, aiSeg: $('#scanAiSeg').checked }), `Digitalização (${SCAN.length} fotos)`);
+  if (!(await requireLogin()) || !(await ensureConsent())) return;
+  runJob('Multi-imagem → 3D (IA na nuvem)', ['Enviando as fotos', 'Reconstruindo em 3D na GPU', 'Pintando e preparando'], async () => {
+    // até 4 fotos espalhadas pela volta (0°, 90°, 180°, 270°); o servidor tenta TRELLIS e, se não der, Hunyuan3D com a 1ª
+    const pick = [0, 1, 2, 3].map(k => SCAN[Math.floor(k * SCAN.length / Math.min(4, SCAN.length))]).filter((v, i, a) => v && a.indexOf(v) === i);
+    const front = SCAN[0];
+    progress(1, 0);
+    const res = await cloudMulti(pick.map(v => v.file));
+    progress(2, 0); await frame();
+    const rep = finishCloud(res, front.im, segment(front.im, 0).mask, height);
+    progressClose(); setModel(rep, `Digitalização (${res.model})`); toast(`Modelo gerado por ${res.model}.`, 'ok');
+  });
+};
+
+// Relevo
+const REL = { im: null };
+async function setRelFile(f) {
+  if (!f?.type.startsWith('image/')) return toast('Escolha um arquivo de imagem.', 'bad');
+  REL.im = await loadIm(f, 640); REL.name = f.name.replace(/\.[^.]+$/, '');
+  drawMasked($('#relCanvas'), REL.im, null); $('#relCanvas').hidden = false; $('#relEmpty').hidden = true; $('#btnRelGen').disabled = false;
+}
+$('#relFile').onchange = e => e.target.files[0] && setRelFile(e.target.files[0]);
+dropZone($('#relDrop'), f => setRelFile(f[0]));
+$('#btnRelGen').onclick = () => {
+  const kind = document.querySelector('input[name=relKind]:checked').value;
+  const rep = buildRelief(REL.im, { kind, width: +$('#relW').value || 100, base: +$('#relBase').value || 0.8, depth: +$('#relDepth').value || 2.4, res: +$('#relRes').value });
+  setModel(rep, (kind === 'litho' ? 'Litofania ' : 'Relevo ') + REL.name);
+  toast(kind === 'litho' ? 'Litofania pronta. Ative “Cores” para desligar e ver o relevo.' : 'Relevo pronto.', 'ok');
+};
+
+// Importar
+$('#impFile').onchange = e => e.target.files[0] && importFile(e.target.files[0]).catch(err => toast(err.message, 'bad'));
+dropZone($('#impDrop'), f => importFile(f[0]).catch(err => toast(err.message, 'bad')));
+$('#btnSample').onclick = () => setModel(sampleVase(), 'Vaso de exemplo');
+dropZone(host, f => importFile(f[0]).catch(err => toast(err.message, 'bad')));
+
+/* ---------- Ferramentas do inspetor ---------- */
+function onDim(axis) {
+  const el = $('#dim' + axis.toUpperCase()), val = +el.value; if (!S.stats || !(val > 0)) return;
+  const sz = { x: S.stats.size[0], y: S.stats.size[2], z: S.stats.size[1] }, f = val / sz[axis];
+  edit(() => { if ($('#lockScale').checked) scaleRep(S.rep, f, f, f); else scaleRep(S.rep, axis === 'x' ? f : 1, axis === 'z' ? f : 1, axis === 'y' ? f : 1); });
+}
+['x', 'y', 'z'].forEach(a => $('#dim' + a.toUpperCase()).onchange = () => onDim(a));
+$$('[data-rot]').forEach(b => b.onclick = () => edit(() => {
+  const m = new THREE.Matrix4(), ax = b.dataset.rot; // eixos de impressão: X=x, Y=z, Z=y (visualizador)
+  if (ax === 'x') m.makeRotationX(Math.PI / 2); else if (ax === 'y') m.makeRotationZ(Math.PI / 2); else m.makeRotationY(Math.PI / 2);
+  applyMatrix(S.rep, m);
+}));
+$('#btnMirror').onclick = () => edit(() => { scaleRep(S.rep, -1, 1, 1); });
+$('#cutH').oninput = () => $('#cutOut').textContent = nf(+$('#cutH').value) + ' mm';
+$('#btnCut').onclick = () => edit(() => {
+  const h = +$('#cutH').value; if (!(h > 0)) throw new Error('Escolha uma altura de corte maior que zero.');
+  const r = cutBelow(S.rep, bbox(S.rep).min[1] + h); if (!r.rep.idx.length) throw new Error('O corte removeu o modelo inteiro.');
+  S.rep = r.rep; return `Base cortada a ${nf(h)} mm e fechada (${r.loops} contorno${r.loops === 1 ? '' : 's'}).`;
+});
+$('#btnRepair').onclick = () => edit(() => {
+  const before = S.stats, r = repairAll(S.rep); S.rep = r.rep;
+  const after = analyze(S.rep);
+  return `Reparo: ${r.filled} furo(s) fechado(s), ${r.removed} pedaço(s) removido(s), normais corrigidas. Bordas abertas: ${before.open} → ${after.open}.`;
+});
+$('#btnSmooth').onclick = () => edit(() => { taubin(S.rep, 4); return 'Superfície suavizada.'; });
+$('#btnIslands').onclick = () => edit(() => { const r = removeIslands(S.rep, 0.05); S.rep = r.rep; return `${r.removed} pedaço(s) solto(s) removido(s).`; });
+$('#tUndo').onclick = () => { if (S.undo.length) { S.rep = S.undo.pop(); refresh(); toast('Desfeito.'); } };
+['#selPrinter', '#selMat', '#selLayer', '#inInfill', '#inWalls'].forEach(s => $(s).addEventListener('input', () => { if (s === '#selPrinter') buildBed(); updateEstimate(); }));
+$$('[data-exp]').forEach(b => b.onclick = () => doExport(b.dataset.exp));
+$('#btnExportTop').onclick = () => doExport('stl');
+$('#projName').onchange = () => { S.name = $('#projName').value; $('#infoName').textContent = S.name; };
+
+const tog = (id, key, after) => $(id).onclick = () => { S[key] = !S[key]; $(id).setAttribute('aria-pressed', S[key]); after(); };
+tog('#tRotate', 'rot', () => controls.autoRotate = S.rot);
+tog('#tColor', 'colors', () => refresh());
+tog('#tWire', 'wire', () => refresh());
+tog('#tOver', 'over', () => refresh());
+$('#tFit').onclick = fitView;
+
+$('#btnSettings').onclick = () => $('#dlgApi').showModal();
+
+// Conta
+[$('#btnAccount'), $('#railCredits'), $('#apiChip')].forEach(b => b.onclick = async () => { await sb(); openAccount(''); });
+$('#accClose').onclick = () => { ACC.recovering = false; $('#dlgAccount').close(); };
+$$('input[name=accMode]').forEach(r => r.onchange = () => {
+  $('#accUpNote').hidden = accMode() !== 'up'; $('#accForgot').hidden = accMode() === 'up';
+  $('#accPass').autocomplete = accMode() === 'up' ? 'new-password' : 'current-password'; renderAccountDialog();
+});
+const authMsg = m => /Invalid login/i.test(m) ? 'E-mail ou senha incorretos.' : /not confirmed/i.test(m) ? 'Confirme seu e-mail pelo link que enviamos antes de entrar.'
+  : /already registered/i.test(m) ? 'Este e-mail já tem conta. Use “Entrar”.' : /at least 6/i.test(m) ? 'A senha precisa ter pelo menos 6 caracteres.'
+  : /rate limit/i.test(m) ? 'Muitas tentativas. Espere alguns minutos e tente de novo.' : m;
+const appUrl = () => location.href.split('#')[0].split('?')[0];
+$('#accGo').onclick = async () => {
+  const email = $('#accEmail').value.trim(), password = $('#accPass').value, client = await sb();
+  if (!email || !password) return ($('#accMsg').textContent = 'Preencha e-mail e senha.');
+  $('#accGo').disabled = true;
+  try {
+    if (accMode() === 'up') {
+      const { data, error } = await client.auth.signUp({ email, password, options: { emailRedirectTo: appUrl() } });
+      if (error) throw error;
+      $('#accMsg').textContent = data.session ? 'Conta criada!' : `Enviamos um link de confirmação para ${email}. Abra o e-mail, confirme e depois entre aqui.`;
+    } else {
+      const { error } = await client.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      $('#accMsg').textContent = ''; $('#accPass').value = ''; toast('Você entrou na sua conta.', 'ok');
+    }
+  } catch (e) { $('#accMsg').textContent = authMsg(e.message || String(e)); }
+  finally { $('#accGo').disabled = false; }
+};
+$('#accForgot').onclick = async () => {
+  const email = $('#accEmail').value.trim(); if (!email) return ($('#accMsg').textContent = 'Digite seu e-mail acima e clique de novo em “Esqueci a senha”.');
+  const { error } = await (await sb()).auth.resetPasswordForEmail(email, { redirectTo: appUrl() });
+  $('#accMsg').textContent = error ? authMsg(error.message) : `Se existir uma conta com ${email}, enviamos um link para criar uma nova senha.`;
+};
+$('#accSetPass').onclick = async () => {
+  const password = $('#accNewPass').value;
+  const { error } = await (await sb()).auth.updateUser({ password });
+  if (error) return ($('#accMsg').textContent = authMsg(error.message));
+  ACC.recovering = false; $('#accNewPass').value = ''; $('#accMsg').textContent = 'Senha atualizada.'; renderAccountDialog();
+};
+$('#accLogout').onclick = async () => { await (await sb()).auth.signOut(); $('#accMsg').textContent = 'Você saiu da conta.'; renderAccountDialog(); };
+// Painel do administrador
+let admTimer;
+async function loadAdminList() {
+  const { data, error } = await (await sb()).rpc('admin_list_users', { p_search: $('#admSearch').value.trim() });
+  if (error) return ($('#admList').innerHTML = `<p class="hint">${error.message}</p>`);
+  $('#admList').innerHTML = data.map(u => `<div><span title="${u.email}">${u.email}${u.is_admin ? ' · admin' : ''}</span><b class="pos">${u.is_admin ? '∞' : u.credits}</b><small>${u.generations} ger.</small></div>`).join('') || '<p class="hint">Nenhum usuário encontrado.</p>';
+}
+$('#admSearch').oninput = () => { clearTimeout(admTimer); admTimer = setTimeout(loadAdminList, 300); };
+$('#admList').onclick = e => { const s = e.target.closest('div')?.querySelector('span'); if (s) $('#admEmail').value = s.title; };
+$('#admGrant').onclick = async () => {
+  const email = $('#admEmail').value.trim(), amount = parseInt($('#admAmount').value, 10);
+  if (!email || !amount) return ($('#accMsg').textContent = 'Informe o e-mail e a quantidade.');
+  const { data, error } = await (await sb()).rpc('admin_grant_credits', { p_email: email, p_amount: amount });
+  if (error) return ($('#accMsg').textContent = /usuario_nao_encontrado/.test(error.message) ? 'Usuário não encontrado.' : error.message);
+  $('#accMsg').textContent = `${email} agora tem ${data} créditos.`; loadAdminList();
+};
+sb().then(c => c.auth.getSession()).then(({ data }) => { ACC.user = data.session?.user || null; refreshProfile(); }).catch(() => {});
+$('#btnPreload').onclick = async () => {
+  $('#dlgApi').close();
+  progressOpen('Baixando a IA do aparelho', ['Recorte de fundo (ORMBG)', 'Profundidade (Depth Anything V2)']);
+  try {
+    await aiPipeline('seg', 'background-removal', 'onnx-community/ormbg-ONNX'); progress(1, 0);
+    await aiPipeline('depth', 'depth-estimation', 'onnx-community/depth-anything-v2-small'); progress(2, 0);
+    progressClose(); toast('IA do aparelho pronta. Agora ela funciona sem internet.', 'ok');
+  } catch (e) { progressClose(); toast(e.message, 'bad'); }
+};
+
+/* ---------- Início ---------- */
+$('#selPrinter').innerHTML = Object.keys(PRINTERS).map(k => `<option>${k}</option>`).join('');
+buildBed(); resize(); renderScanThumbs(); renderGallery();
+try { const m = localStorage.getItem('mode'); if (m) setMode(m); } catch {}
+setModel(sampleVase(), 'Vaso de exemplo');
+showImgEngine();
+updateApiChip();
+</script>
+</body>
+</html>
